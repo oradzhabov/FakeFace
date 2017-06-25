@@ -1,0 +1,1 @@
+Call install & unisntall scripts with Administrator permissions
