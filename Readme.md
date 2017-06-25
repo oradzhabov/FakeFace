@@ -69,4 +69,3 @@ Use only release build
 * On the panel "Video settings" select webcam: "FakeFace Virtual Cam"
 * Enjoy
     
-![Alt text](img/FakeFace_demo.gif ?raw=true "Title")
