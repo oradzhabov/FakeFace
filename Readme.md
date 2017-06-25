@@ -1,3 +1,5 @@
+![Alt text](https://github.com/oradzhabov/FakeFace/blob/master/img/FakeFace_demo.gif?raw=true "Title")
+
 # Minimum Requirements
 
 * Windows OS
@@ -67,3 +69,4 @@ Use only release build
 * On the panel "Video settings" select webcam: "FakeFace Virtual Cam"
 * Enjoy
     
+![Alt text](img/FakeFace_demo.gif ?raw=true "Title")
