@@ -3,9 +3,9 @@
 #include "FakeFace.h"
 #include <opencv2/opencv.hpp>
 
-#ifdef WIN32
+#ifdef USE_PPL
 	#include <ppl.h>
-#endif // WIN32
+#endif // USE_PPL
 
 CFakeFace::CFakeFace()
 {
@@ -28,7 +28,7 @@ CFakeFace::GetLandmars() const
     return m_landmarkContainer;
 }
 
-const cv::Mat
+const cv::Mat &
 CFakeFace::GetImg32f() const
 {
     return m_img32f;
@@ -102,10 +102,10 @@ morphTriangle(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
     std::vector<cv::Point> tRectInt;
     for(int i = 0; i < 3; i++)
     {
-        tRect.push_back( cv::Point2f( t[i].x - r.x, t[i].y -  r.y) );
+        tRect.push_back( cv::Point2f( t[i].x - r.x, t[i].y - r.y) );
         tRectInt.push_back( cv::Point(t[i].x - r.x, t[i].y - r.y) ); // for fillConvexPoly
         
-        t1Rect.push_back( cv::Point2f( t1[i].x - r1.x, t1[i].y -  r1.y) );
+        t1Rect.push_back( cv::Point2f( t1[i].x - r1.x, t1[i].y - r1.y) );
         t2Rect.push_back( cv::Point2f( t2[i].x - r2.x, t2[i].y - r2.y) );
     }
     
@@ -149,9 +149,11 @@ void PoissonBlend(const cv::Mat & base, const cv::Mat & src, const cv::Mat & mas
         cv::Mat & res_prev = (iter % 2) == 0 ? res2 : res1;
         cv::Mat & res = (iter % 2) == 0 ? res1 : res2;
         
-        //for(int i = roi.y; i < roi.y + roi.height; ++i)
+#ifdef USE_PPL
         Concurrency::parallel_for ((int)(roi.y), (int)(roi.y + roi.height), [&](int i){
-        {
+#else
+        for(int i = roi.y; i < roi.y + roi.height; ++i){
+#endif // USE_PPL
             cv::Point neighbours[4];
             for(int j = roi.x; j < roi.x + roi.width; ++j)
             {
@@ -185,8 +187,11 @@ void PoissonBlend(const cv::Mat & base, const cv::Mat & src, const cv::Mat & mas
                     res.at<cv::Vec3b>(p) = col;
                 }
             }
-        }
+#ifdef USE_PPL
         });
+#else
+        }
+#endif // USE_PPL
     }
 }
 

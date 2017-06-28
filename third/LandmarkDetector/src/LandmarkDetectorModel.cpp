@@ -66,9 +66,9 @@
 #ifdef HAVE_TBB // ros:
 	#include <tbb/tbb.h>
 #else // HAVE_TBB
-	#ifdef WIN32
+    #ifdef USE_PPL
 		#include <ppl.h>
-	#endif // WIN32
+    #endif // USE_PPL
 #endif // HAVE_TBB
 
 // Local includes
@@ -606,13 +606,12 @@ bool CLNF::DetectLandmarks(const cv::Mat_<uchar> &image, const cv::Mat_<float> &
 #ifdef HAVE_TBB // ros:
 	    tbb::parallel_for(0, (int)hierarchical_models.size(), [&](int part_model){
 #else // HAVE_TBB
-	#ifdef WIN32
+	#ifdef USE_PPL
 		Concurrency::parallel_for ((int)(0), (int)hierarchical_models.size(), [&](int part_model){
 	#else
-		for(int part_model = 0; part_model < (int)hierarchical_models.size(); part_model++)
-	#endif
+		for(int part_model = 0; part_model < (int)hierarchical_models.size(); part_model++){
+	#endif // USE_PPL
 #endif // HAVE_TBB
-		{
 			// Only do the synthetic eye models if we're doing gaze
 			if (!((hierarchical_model_names[part_model].compare("right_eye_28") == 0 ||
 			hierarchical_model_names[part_model].compare("left_eye_28") == 0)
@@ -651,13 +650,14 @@ bool CLNF::DetectLandmarks(const cv::Mat_<uchar> &image, const cv::Mat_<float> &
 					hierarchical_models[part_model].pdm.CalcShape2D(hierarchical_models[part_model].detected_landmarks, hierarchical_models[part_model].params_local, hierarchical_models[part_model].params_global);
 				}
 			}
-		}
 #ifdef HAVE_TBB // ros:
 	    });
-#else //
-	#ifdef WIN32
+#else
+	#ifdef USE_PPL
 		});
-	#endif
+    #else
+        }
+	#endif // USE_PPL
 #endif // HAVE_TBB
 
 		// Recompute main model based on the fit part models

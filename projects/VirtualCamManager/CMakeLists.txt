@@ -45,6 +45,7 @@ link_directories(${Boost_LIBRARY_DIRS})
 add_executable(VirtualCamManager WIN32 ${SOURCE} ${HEADERS})
 
 add_definitions(-DHEAD_POSE_ESTIMATOR_DEBUG
+	-DUSE_PPL
 	-DDLIB_HAVE_SSE2
 	-DDLIB_HAVE_SSE3
 	-DDLIB_HAVE_SSE4

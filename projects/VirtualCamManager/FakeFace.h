@@ -19,7 +19,7 @@ public:
     const bool  IsInitialized() const;
     const dlib::full_object_detection & GetLandmars() const;
 //    const cv::Mat   GetImgOrig() const;
-    const cv::Mat   GetImg32f() const;
+    const cv::Mat &  GetImg32f() const;
 };
 
 // Warps and alpha blends triangular regions from img1 and img2 to img

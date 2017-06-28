@@ -66,9 +66,9 @@
 #ifdef HAVE_TBB // ros:
 	#include <tbb/tbb.h>
 #else // HAVE_TBB
-	#ifdef WIN32
+    #ifdef USE_PPL
 		#include <ppl.h>
-	#endif // WIN32
+    #endif // USE_PPL
 #endif // HAVE_TBB
 
 // Math includes
@@ -206,14 +206,12 @@ void Patch_experts::Response(vector<cv::Mat_<float> >& patch_expert_responses, c
 #ifdef HAVE_TBB // ros:
 	tbb::parallel_for(0, (int)n, [&](int i){
 #else // HAVE_TBB
-	#ifdef WIN32
-		Concurrency::parallel_for (int(0), n, [&](int i){
-	#else
-		for(int i = 0; i < n; i++)
-	#endif
+#ifdef USE_PPL
+	Concurrency::parallel_for (int(0), n, [&](int i){
+#else
+    for(int i = 0; i < n; i++) {
+#endif // USE_PPL
 #endif // HAVE_TBB
-	{
-			
 		if(visibilities[scale][view_id].rows == n)
 		{
 			if(visibilities[scale][view_id].at<int>(i,0) != 0)
@@ -309,13 +307,14 @@ void Patch_experts::Response(vector<cv::Mat_<float> >& patch_expert_responses, c
 				}
 			}
 		}
-	}
 #ifdef HAVE_TBB // ros:
 	});
 #else
-	#ifdef WIN32
-		});
-	#endif
+#ifdef USE_PPL
+	});
+#else
+    }
+	#endif // USE_PPL
 #endif // HAVE_TBB
 
 }

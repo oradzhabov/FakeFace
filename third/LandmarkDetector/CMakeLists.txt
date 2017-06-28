@@ -36,7 +36,8 @@ include_directories(./include)
 include_directories(${LandmarkDetector_SOURCE_DIR}/include)
 
 
-add_definitions(-DDLIB_HAVE_SSE2
+add_definitions(-DUSE_PPL
+	-DDLIB_HAVE_SSE2
 	-DDLIB_HAVE_SSE3
 	-DDLIB_HAVE_SSE4
 	-D_UNICODE

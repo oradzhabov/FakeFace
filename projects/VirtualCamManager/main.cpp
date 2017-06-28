@@ -109,7 +109,7 @@
 
 
             // calc poses, not just obtaining results
-            // todo: Actually, for ontaing shapes it does not necessary and may take additional time for processing
+            // todo: Actually, for obtaing shapes it does not necessary and may take additional time for processing
             //std::vector<head_pose> poses = g_estimator->poses();
 
             // Do not update result if we have no success
@@ -128,7 +128,7 @@
 
                     if (isLazyDataPrepared)
                     {
-                        imgMorph = estInputFrame32f; // todo: actually heere should be clone()
+                        imgMorph = estInputFrame32f; // todo: actually here should be clone()
                     }
                     else
                     {
@@ -175,17 +175,18 @@
                         mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
                         //cv::inRange(imgMorph, cv::Scalar(1,1,1), cv::Scalar(255,255,255), mask);
 
-                        cv::Mat temp;
-                        imgMorph.convertTo(temp, CV_8UC3);
-				        cv::Rect r = cv::boundingRect(t2_all);
-				        cv::Point center = (r.tl() + r.br()) / 2;
-                        cv::threshold(temp, mask, 1, 255, cv::THRESH_BINARY);
+                        cv::Mat temp8uc3;
+                        imgMorph.convertTo(temp8uc3, CV_8UC3);
+				        cv::Rect    estMeshRect = cv::boundingRect(t2_all);
+                        cv::threshold(temp8uc3, mask, 1, 255, cv::THRESH_BINARY);
 
                         // Fast implementation of Poisson blend (not OpenCV's) negotiate to use lazy data preparation.
                         // So it is not necessary to set \isLazyDataPrepared true because it does not effect to speed performance
                         //
+				        // cv::Point   center = (estMeshRect.tl() + estMeshRect.br()) / 2;
                         // cv::seamlessClone(temp, estInputFrame, mask, center, imgMorph8uc3, cv::NORMAL_CLONE);
-                        PoissonBlend(estInputFrame, temp, mask, imgMorph8uc3, r);
+                        //
+                        PoissonBlend(estInputFrame, temp8uc3, mask, imgMorph8uc3, estMeshRect);
 
                         //mask.convertTo (imgMorph8uc3, CV_8UC3);
                         //imgMorph.convertTo (imgMorph8uc3, CV_8UC3);
