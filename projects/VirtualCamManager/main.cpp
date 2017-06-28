@@ -216,8 +216,6 @@ PLAYSTATE g_psCurrent = Stopped;
 
 HANDLE hMapFile = NULL;
 
-HWND hListBox;
-const int ListBoxWidth = 320;
 std::vector<std::wstring> device_names;
 
 
@@ -393,12 +391,6 @@ HRESULT CaptureVideo()
     {
         // Don't display a message because CreateVideoGraph will handle it
         return hr;
-    }
-    //
-    for (size_t i = 0; i < device_names.size(); ++i)
-    {
-        int pos = SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)device_names[i].c_str());
-        SendMessage(hListBox, LB_SETITEMDATA, pos, (LPARAM) i);
     }
 
     // Render the preview pin on the video capture filter
@@ -858,8 +850,7 @@ void ResizeVideoWindow(void)
         
         // Make the preview video fill our window
         GetClientRect(ghApp, &rc);
-// ros:        g_pVW->SetWindowPosition(0, 0, rc.right, rc.bottom);
-        g_pVW->SetWindowPosition(ListBoxWidth, 0, rc.right, rc.bottom);
+        g_pVW->SetWindowPosition(0, 0, rc.right, rc.bottom);
     }
 }
 
@@ -998,14 +989,6 @@ HRESULT HandleGraphEvent(void)
 // http://stackoverflow.com/questions/4473431/win32-how-to-create-a-listbox-control-using-the-createwindowexw-function
 void InitializeComponent(HWND hWnd) {
     HINSTANCE hInstance = GetModuleHandle(NULL);
-
-    // Adding a ListBox.
-    
-    hListBox = CreateWindowExW(WS_EX_CLIENTEDGE | LBS_NOTIFY
-        , L"LISTBOX", NULL
-        , WS_CHILD | WS_VISIBLE |  LBS_STANDARD | ES_AUTOVSCROLL
-        , 0, 0, ListBoxWidth, 200
-        , hWnd, (HMENU)101, hInstance, NULL);
 }
 
 LRESULT CALLBACK WndMainProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1026,14 +1009,6 @@ LRESULT CALLBACK WndMainProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
                     {
                         switch (wmEvent) 
                         {
-                            case LBN_SELCHANGE:
-                            {
-                                int lbItem  = SendMessage(hListBox, LB_GETCURSEL, 0, 0);
-                                int i = (int)SendMessage(hListBox, LB_GETITEMDATA, lbItem, 0);
-                                //Msg(L"%d",i);
-
-                                break;
-                            }
                         }
                     }
                     break;
