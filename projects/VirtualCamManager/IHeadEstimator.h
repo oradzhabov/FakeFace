@@ -24,6 +24,7 @@ public:
    
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
 
+    IHeadEstimator();
 
 	virtual ~IHeadEstimator() {};
 
@@ -42,7 +43,7 @@ protected:
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
     IHeadEstimator::TriMesh  m_FaceMesh; // formed by landmarkes
-
+private:
 	const int readFaceMesh(const char * pFileName);
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
 };

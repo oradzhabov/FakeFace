@@ -7,6 +7,16 @@ cv::Point2f toCv(const dlib::point& p)
     return cv::Point2f(p.x(), p.y());
 }
 
+IHeadEstimator::IHeadEstimator()
+{
+#ifdef HEAD_POSE_ESTIMATOR_DEBUG
+    if (readFaceMesh("conn.txt") == false)
+        std::cout << "File conn.txt with face-mesh had not been read" << std::endl;
+    else
+        std::cout << "File conn.txt with face-mesh has been read successfully" << std::endl;
+#endif // HEAD_POSE_ESTIMATOR_DEBUG
+}
+
 const int
 IHeadEstimator::readFaceMesh(const char * pFileName)
 {

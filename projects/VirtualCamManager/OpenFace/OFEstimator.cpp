@@ -20,7 +20,8 @@
 
 
 OFEstimator::OFEstimator()
-	:det_parameters(NULL),
+	:IHeadEstimator(),
+    det_parameters(NULL),
 	clnf_model(NULL)
 {
 	vector<string> arguments;
@@ -76,13 +77,6 @@ OFEstimator::OFEstimator()
 	}
 
 	det_parameters->track_gaze = false;
-
-#ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    if (readFaceMesh("conn.txt") == false)
-        std::cout << "File conn.txt with face-mesh had not been read" << std::endl;
-    else
-        std::cout << "File conn.txt with face-mesh has been read successfully" << std::endl;
-#endif // HEAD_POSE_ESTIMATOR_DEBUG
 }
 
 

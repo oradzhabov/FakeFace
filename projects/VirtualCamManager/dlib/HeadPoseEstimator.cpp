@@ -22,6 +22,7 @@ bool cvRectAreaComparer (cv::Rect & i,cv::Rect & j) { return (i.area() > j.area(
 const double HeadPoseEstimator::TICK_FREQUENCY = cv::getTickFrequency();
 
 HeadPoseEstimator::HeadPoseEstimator():
+        IHeadEstimator(),
         focalLength(350),
         opticalCenterX(-1),
         opticalCenterY(-1),
@@ -94,13 +95,6 @@ HeadPoseEstimator::Load(const std::string& face_detection_model, float focalLeng
 
     // Measures Noise Covariance Matrix R
     cv::setIdentity(kf->measurementNoiseCov, cv::Scalar(1)); // 1e-1
-
-#ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    if (readFaceMesh("conn.txt") == false)
-        std::cout << "File conn.txt with face-mesh had not been read" << std::endl;
-    else
-        std::cout << "File conn.txt with face-mesh has been read successfully" << std::endl;
-#endif // HEAD_POSE_ESTIMATOR_DEBUG
 
     // Load face detection and pose estimation models.
     detector = dlib::get_frontal_face_detector();
