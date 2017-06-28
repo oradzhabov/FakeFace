@@ -41,7 +41,8 @@
     bool                g_isEstimatorThreadShouldBeClose = false;
     cv::Mat             g_estInputFrame(480, 640, CV_8UC3);
     cv::Mat             g_estOutputFrame(480, 640, CV_8UC3);
-    cv::Mat             g_estOutputFrame2(480, 640, CV_8UC3);
+    cv::Mat             g_estOutputFrameBackbuffer(480, 640, CV_8UC3);
+    bool                g_IsEstOutputFrameHasBeenUpdated = false;
     CFakeFace           g_fakeFace;
     //
     void    putToEstimator(BYTE * pData)
@@ -55,8 +56,15 @@
     {
         BYTE *  result = NULL;
         EnterCriticalSection(&g_crit_output);
-            g_estOutputFrame2 = g_estOutputFrame.clone();
-            result = g_estOutputFrame2.data;
+
+            // To avoid slow deep copy operation: g_estOutputFrameBackbuffer = g_estOutputFrame.clone()
+            // use backbuffer technique
+            if (g_IsEstOutputFrameHasBeenUpdated == true)
+            {
+                std::swap (g_estOutputFrame.data, g_estOutputFrameBackbuffer.data);
+                g_IsEstOutputFrameHasBeenUpdated = false;
+            }
+            result = g_estOutputFrameBackbuffer.data;
         LeaveCriticalSection(&g_crit_output);
         return result;
     }
@@ -64,7 +72,7 @@
     {
         cv::Mat                                     estInputFrame(480, 640, CV_8UC3);
         cv::Mat                                     estInputFrame32f(480, 640, CV_32FC3);
-        IHeadEstimator::TriMesh						estTriangles;
+        IHeadEstimator::TriMesh						estFaceMesh;
         cv::Mat                                     imgMorph = cv::Mat::zeros(480, 640, CV_32FC3);
         cv::Mat                                     imgMorph8uc3 = cv::Mat::zeros(480, 640, CV_8UC3);
         cv::Mat                                     mask(480, 640, CV_8UC3);
@@ -78,17 +86,20 @@
 
         while (g_isEstimatorThreadShouldBeClose == false)
         {
-            // todo: actually here would be better to use thread-wainting-functions, instead of speed-up-loop
+            // todo: actually here would be better to use thread-waiting-functions, instead of speed-up-loop
 
             EnterCriticalSection(&g_crit_input);
                 estInputFrame = g_estInputFrame.clone();
+                // todo: actually we could use follow line to avoid clone() but I'm not sure that .data will be good separated
+                // in different threads
+                // const cv::Mat   estInputFrame(480, 640, CV_8UC3, g_estInputFrame.data);
             LeaveCriticalSection(&g_crit_input);
 
             // wrap part of code where estimator should be in stabilized state by their crit-section
             EnterCriticalSection(&g_crit_estimator);
 
             if (g_isFirstEstimatorFrame == true)
-                g_estimator->GetTriangles(estTriangles);
+                g_estimator->GetTriangles(estFaceMesh);
 
             g_estimator->update(estInputFrame, g_isFirstEstimatorFrame);
 
@@ -107,7 +118,10 @@
             {
                 const dlib::full_object_detection & estShape = g_estimator->getShape(0);
 
-                if (estTriangles.empty() == false && g_fakeFace.IsInitialized())
+                //
+                // If we have mesh and fake face
+                //
+                if (estFaceMesh.empty() == false && g_fakeFace.IsInitialized())
                 {
                     const dlib::full_object_detection & fakeShape = isLazyDataPrepared ? lazy_fakeLandmarks : g_fakeFace.GetLandmars();
                     estInputFrame.convertTo(estInputFrame32f, CV_32FC3);
@@ -125,10 +139,10 @@
                     }
 
                     std::vector<cv::Point2f> t2_all;
-                    for (size_t ti = 0; ti < estTriangles.size(); ++ti)
+                    for (size_t ti = 0; ti < estFaceMesh.size(); ++ti)
                     {
                         std::vector<cv::Point2f> t1, t2;
-                        const IHeadEstimator::sTriangle & tri = estTriangles[ti];
+                        const IHeadEstimator::sTriangle & tri = estFaceMesh[ti];
 
                         t1.push_back(toCv(fakeShape.part(tri.vInd[0])));
                         t1.push_back(toCv(fakeShape.part(tri.vInd[1])));
@@ -192,15 +206,17 @@
 
                     EnterCriticalSection(&g_crit_output);
                         cv::flip(imgMorph8uc3, g_estOutputFrame, 0); // flip requires different holders
+                        g_IsEstOutputFrameHasBeenUpdated = true;
                     LeaveCriticalSection(&g_crit_output);
                     
                 }
-                else
+                else // If we have not mesh OR fake face
                 {
                     g_estimator->calc_pose(0); // to draw lines
 
                     EnterCriticalSection(&g_crit_output);
                         cv::flip(g_estimator->_debug, g_estOutputFrame, 0); // flip requires different holders
+                        g_IsEstOutputFrameHasBeenUpdated = true;
                     LeaveCriticalSection(&g_crit_output);
                 }
             }

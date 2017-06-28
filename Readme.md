@@ -77,3 +77,6 @@ Use only release target
 * On the panel "Video settings" select webcam: "FakeFace Virtual Cam"
 * Enjoy
     
+# Tips
+* Avoid back lighting. Set light direction frontal to face
+* Use clothes that cover your neck. Color of your face shold not interfere with color of neck as background color
