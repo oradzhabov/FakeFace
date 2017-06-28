@@ -77,10 +77,6 @@
         cv::Mat                                     imgMorph8uc3 = cv::Mat::zeros(480, 640, CV_8UC3);
         cv::Mat                                     mask(480, 640, CV_8UC3);
         //
-        bool                                        isLazyDataPrepared = false;
-        dlib::full_object_detection                 lazy_fakeLandmarks;
-        cv::Mat                                     lazy_fakeImg32f(480, 640, CV_32F);
-        //
         
         g_isFirstEstimatorFrame = true;
 
@@ -103,8 +99,6 @@
 
             g_estimator->update(estInputFrame, g_isFirstEstimatorFrame);
 
-            if (g_isFirstEstimatorFrame == true)
-                isLazyDataPrepared = false;
             g_isFirstEstimatorFrame = false;
 
 
@@ -123,20 +117,13 @@
                 //
                 if (estFaceMesh.empty() == false && g_fakeFace.IsInitialized())
                 {
-                    const dlib::full_object_detection & fakeShape = isLazyDataPrepared ? lazy_fakeLandmarks : g_fakeFace.GetLandmars();
+                    const dlib::full_object_detection & fakeShape = g_fakeFace.GetLandmars();
                     estInputFrame.convertTo(estInputFrame32f, CV_32FC3);
 
-                    if (isLazyDataPrepared)
-                    {
-                        imgMorph = estInputFrame32f; // todo: actually here should be clone()
-                    }
-                    else
-                    {
-                        // fast way to clear image
-                        // http://answers.opencv.org/question/88254/most-efficient-way-to-clear-an-image-with-c-interface/
-                        imgMorph = cv::Mat::zeros( imgMorph.size(), imgMorph.type() );
+                    // fast way to clear image
+                    // http://answers.opencv.org/question/88254/most-efficient-way-to-clear-an-image-with-c-interface/
+                    imgMorph = cv::Mat::zeros( imgMorph.size(), imgMorph.type() );
 //imgMorph = estInputFrame32f; // todo: actually heere should be clone()
-                    }
 
                     std::vector<cv::Point2f> t2_all;
                     for (size_t ti = 0; ti < estFaceMesh.size(); ++ti)
@@ -157,53 +144,39 @@
                             0:fakeFace, 1:original
                             BUT: Poisson blending will could make more natural result later.
                         */
-                        const double morphFactor = isLazyDataPrepared ? 0.2 : 0.0;
+                        const double morphFactor = 0.0;
 
-                        morphTriangle (isLazyDataPrepared ? lazy_fakeImg32f : g_fakeFace.GetImg32f(),
+                        morphTriangle ( g_fakeFace.GetImg32f(),
                                         estInputFrame32f,
                                         imgMorph,
                                         t1, t2, t2,
                                         morphFactor);
-                        //
-                        // store it for later
-                        if (isLazyDataPrepared == false)
-                            t2_all.insert (t2_all.end(), t2.begin(), t2.end());
+
+                        // store it for future using
+                        t2_all.insert (t2_all.end(), t2.begin(), t2.end());
                     }
 
-                    if (isLazyDataPrepared == false)
-                    {
-                        mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
-                        //cv::inRange(imgMorph, cv::Scalar(1,1,1), cv::Scalar(255,255,255), mask);
+                    mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
 
-                        cv::Mat temp8uc3;
-                        imgMorph.convertTo(temp8uc3, CV_8UC3);
-				        cv::Rect    estMeshRect = cv::boundingRect(t2_all);
-                        cv::threshold(temp8uc3, mask, 1, 255, cv::THRESH_BINARY);
+                    cv::Mat temp8uc3;
+                    imgMorph.convertTo(temp8uc3, CV_8UC3);
+				    cv::Rect    estMeshRect = cv::boundingRect(t2_all);
+                    cv::threshold(temp8uc3, mask, 1, 255, cv::THRESH_BINARY);
 
-                        // Fast implementation of Poisson blend (not OpenCV's) negotiate to use lazy data preparation.
-                        // So it is not necessary to set \isLazyDataPrepared true because it does not effect to speed performance
-                        //
-				        // cv::Point   center = (estMeshRect.tl() + estMeshRect.br()) / 2;
-                        // cv::seamlessClone(temp, estInputFrame, mask, center, imgMorph8uc3, cv::NORMAL_CLONE);
-                        //
-                        PoissonBlend(estInputFrame, temp8uc3, mask, imgMorph8uc3, estMeshRect);
+                    // Fast implementation of Poisson blend (not OpenCV's) negotiate to use lazy data preparation.
+                    // So it is not necessary to set \isLazyDataPrepared true because it does not effect to speed performance
+                    //
+				    // cv::Point   center = (estMeshRect.tl() + estMeshRect.br()) / 2;
+                    // cv::seamlessClone(temp, estInputFrame, mask, center, imgMorph8uc3, cv::NORMAL_CLONE);
+                    //
+                    PoissonBlend(estInputFrame, temp8uc3, mask, imgMorph8uc3, estMeshRect);
 
-                        //mask.convertTo (imgMorph8uc3, CV_8UC3);
-                        //imgMorph.convertTo (imgMorph8uc3, CV_8UC3);
-                        //
-                        // Set to true for slow OpenCV's version of Poisson Blending.
-                        //
-                        // isLazyDataPrepared      = true;
-                        if (isLazyDataPrepared)
-                        {
-                            lazy_fakeLandmarks      = estShape;
-                            imgMorph8uc3.convertTo(lazy_fakeImg32f, CV_32FC3);
-                        }
-                    }
-                    else
-                    {
-                        imgMorph.convertTo(imgMorph8uc3, CV_8UC3);
-                    }
+                    //mask.convertTo (imgMorph8uc3, CV_8UC3);
+                    //imgMorph.convertTo (imgMorph8uc3, CV_8UC3);
+                    //
+                    // Set to true for slow OpenCV's version of Poisson Blending.
+                    //
+                    // isLazyDataPrepared      = true;
 
                     EnterCriticalSection(&g_crit_output);
                         cv::flip(imgMorph8uc3, g_estOutputFrame, 0); // flip requires different holders
