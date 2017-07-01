@@ -38,10 +38,12 @@ include_directories(${FaceAnalyser_SOURCE_DIR}/include)
 add_subdirectory(third/LandmarkDetector)
 add_subdirectory(third/FaceAnalyser)
 add_subdirectory(third/DirectShow/baseclasses)
+add_subdirectory(third/DirectShow/filters/ezrgb24)
 add_subdirectory(projects/VirtualCamManager)
 add_subdirectory(projects/VirtualCamDevice)
 
 add_dependencies (FaceAnalyser LandmarkDetector)
+add_dependencies (ezrgb24 strmbase)
 add_dependencies (VirtualCamDevice strmbase)
 add_dependencies (VirtualCamManager FaceAnalyser)
 
@@ -55,5 +57,11 @@ add_dependencies (VirtualCamManager FaceAnalyser)
 # endif()
 
 
+set_target_properties( strmbase ezrgb24 LandmarkDetector FaceAnalyser VirtualCamDevice VirtualCamManager
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
 # target_link_libraries(VirtualCamManager FaceAnalyser LandmarkDetector ${dlib_LIBRARIES})
 # target_link_libraries(main FaceAnalyser LandmarkDetector ${dlib_LIBRARIES})
