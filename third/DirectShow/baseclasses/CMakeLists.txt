@@ -1,0 +1,83 @@
+SET(SOURCE
+	amextra.cpp
+	amfilter.cpp
+	amvideo.cpp
+	arithutil.cpp
+	combase.cpp
+	cprop.cpp
+	ctlutil.cpp
+	ddmm.cpp
+	dllentry.cpp
+	dllsetup.cpp
+	mtype.cpp
+	outputq.cpp
+	perflog.cpp
+	pstream.cpp
+	pullpin.cpp
+	refclock.cpp
+	renbase.cpp
+	schedule.cpp
+	seekpt.cpp
+	source.cpp
+	strmctl.cpp
+	sysclock.cpp
+	transfrm.cpp
+	transip.cpp
+	videoctl.cpp
+	vtrans.cpp
+	winctrl.cpp
+	winutil.cpp
+	wxdebug.cpp
+	wxlist.cpp
+	wxutil.cpp
+)
+
+SET(HEADERS
+	amextra.h
+	amfilter.h
+	cache.h
+	combase.h
+	cprop.h
+	ctlutil.h
+	ddmm.h
+	dllsetup.h
+	dxmperf.h
+	fourcc.h
+	measure.h
+	msgthrd.h
+	mtype.h
+	outputq.h
+	perflog.h
+	perfstruct.h
+	pstream.h
+	pullpin.h
+	refclock.h
+	reftime.h
+	renbase.h
+	schedule.h
+	seekpt.h
+	source.h
+	streams.h
+	strmctl.h
+	sysclock.h
+	transfrm.h
+	transip.h
+	videoctl.h
+	vtrans.h
+	winctrl.h
+	winutil.h
+	wxdebug.h
+	wxlist.h
+	wxutil.h
+)
+
+include_directories(.)
+
+add_definitions(
+	-D_UNICODE
+	-DUNICODE
+)
+
+add_library(strmbase STATIC ${SOURCE} ${HEADERS} )
+
+target_link_libraries(strmbase strmiids.lib)

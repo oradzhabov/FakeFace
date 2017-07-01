@@ -12,11 +12,6 @@
 #pragma comment(lib, "ole32")
 #pragma comment(lib, "oleaut32")
 
-#ifdef _DEBUG
-    #pragma comment(lib, "strmbasd")
-#else
-    #pragma comment(lib, "strmbase")
-#endif
 #endif
 
 

@@ -37,10 +37,12 @@ include_directories(${FaceAnalyser_SOURCE_DIR}/include)
 
 add_subdirectory(third/LandmarkDetector)
 add_subdirectory(third/FaceAnalyser)
+add_subdirectory(third/DirectShow/baseclasses)
 add_subdirectory(projects/VirtualCamManager)
 add_subdirectory(projects/VirtualCamDevice)
 
 add_dependencies (FaceAnalyser LandmarkDetector)
+add_dependencies (VirtualCamDevice strmbase)
 add_dependencies (VirtualCamManager FaceAnalyser)
 
 # MESSAGE("Download shape predictor resource") 

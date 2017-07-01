@@ -423,7 +423,7 @@ void HeadPoseEstimator::update(const cv::InputArray _image, const bool isFirstFr
     {
         //
         // todo: it coule be speed up if use face(landmarks or else) tracker rather detector.
-        // read pose and comments espacially
+        // read post and comments espacially
         // https://www.learnopencv.com/facial-landmark-detection/
         // http://www.learnopencv.com/object-tracking-using-opencv-cpp-python/
         //

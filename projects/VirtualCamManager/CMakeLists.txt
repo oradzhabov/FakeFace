@@ -30,8 +30,7 @@ SET(HEADERS
 
 include_directories(${dlib_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
-include_directories("C:/Program Files/Microsoft SDKs/Windows/v7.1/Samples/multimedia/directshow/common")
-include_directories("C:/Program Files/Microsoft SDKs/Windows/v7.1/Samples/multimedia/directshow/baseclasses")
+include_directories(../../third/DirectShow/baseclasses)
 include_directories(../../third/LandmarkDetector/include)
 include_directories(../../third/FaceAnalyser/include)
 include_directories(${Boost_INCLUDE_DIRS})
@@ -53,7 +52,6 @@ add_definitions(-DHEAD_POSE_ESTIMATOR_DEBUG
 	-DUNICODE
 )
 
-# target_link_libraries(VirtualCamManager strmiids.lib ${dlib_LIBRARIES} ${OpenCV_LIBRARIES} LandmarkDetector FaceAnalyser ${Boost_LIBRARIES} )
 target_link_libraries(VirtualCamManager strmiids.lib ${dlib_LIBRARIES} ${OpenCV_LIBRARIES} LandmarkDetector FaceAnalyser )
 
 #

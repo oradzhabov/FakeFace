@@ -125,19 +125,21 @@
                     imgMorph = cv::Mat::zeros( imgMorph.size(), imgMorph.type() );
 //imgMorph = estInputFrame32f; // todo: actually heere should be clone()
 
-                    std::vector<cv::Point2f> t2_all;
-                    for (size_t ti = 0; ti < estFaceMesh.size(); ++ti)
+                    const size_t                numTris = estFaceMesh.size();
+                    std::vector<cv::Point2f>    t1(3);
+                    std::vector<cv::Point2f>    t2(3);
+                    std::vector<cv::Point2f>    t2_all;
+                    for (size_t ti = 0; ti < numTris; ++ti)
                     {
-                        std::vector<cv::Point2f> t1, t2;
                         const IHeadEstimator::sTriangle & tri = estFaceMesh[ti];
 
-                        t1.push_back(toCv(fakeShape.part(tri.vInd[0])));
-                        t1.push_back(toCv(fakeShape.part(tri.vInd[1])));
-                        t1.push_back(toCv(fakeShape.part(tri.vInd[2])));
+                        t1[0] = toCv(fakeShape.part(tri.vInd[0]));
+                        t1[1] = toCv(fakeShape.part(tri.vInd[1]));
+                        t1[2] = toCv(fakeShape.part(tri.vInd[2]));
 
-                        t2.push_back(toCv(estShape.part(tri.vInd[0])));
-                        t2.push_back(toCv(estShape.part(tri.vInd[1])));
-                        t2.push_back(toCv(estShape.part(tri.vInd[2])));
+                        t2[0] = toCv(estShape.part(tri.vInd[0]));
+                        t2[1] = toCv(estShape.part(tri.vInd[1]));
+                        t2[2] = toCv(estShape.part(tri.vInd[2]));
     
                         /*
                             at least some info from original will make result natural in lighting sense

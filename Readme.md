@@ -32,8 +32,7 @@ During processing of frames it uses dlib or parts of OpenFace to putting any hum
 * notes:
     1. I've used boost 1.54
 
-## DirectX SDK with samples
-* DirectShow
+## Microsoft Windows SDK
 
 # Build
 Use only release target
