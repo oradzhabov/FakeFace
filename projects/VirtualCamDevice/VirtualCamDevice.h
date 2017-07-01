@@ -173,7 +173,7 @@ private:
     REFERENCE_TIME          m_rtStopAt;
     bool                    m_bStartNotified;
     bool                    m_bStopNotified;
-    DWORD                   m_dwAdviseToken;
+    DWORD_PTR               m_dwAdviseToken;
     IReferenceClock         * m_pRefClock;
     REFERENCE_TIME          m_rtClockStart;
     REFERENCE_TIME          m_rtClockStop;
@@ -181,7 +181,7 @@ private:
     HANDLE                  m_hSemaphore;
     DWORD                   m_dwStartCookie;
     DWORD                   m_dwStopCookie;
-    bool                    m_bShouldFlush;
+    BOOL                    m_bShouldFlush;
 	//
 	HANDLE hMapFile;
 };

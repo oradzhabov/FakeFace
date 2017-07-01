@@ -412,7 +412,7 @@ VirtualCamDeviceStream::VirtualCamDeviceStream(HRESULT *phr, VirtualCamDevice *p
     m_rtStopAt = -1;
     m_dwAdviseToken = 0;
     m_rtClockStart = 0;
-    m_bShouldFlush = false;
+    m_bShouldFlush = FALSE;
     m_dwStartCookie = 0;
     m_dwStopCookie = 0;
 
@@ -587,7 +587,7 @@ HRESULT VirtualCamDeviceStream::FillBuffer(IMediaSample *pms)
         rtLatency = UNITS / 30;
     }
 
-    bool bShouldDeliver = false;
+    BOOL bShouldDeliver = FALSE;
     do
     {
         if (m_dwAdviseToken == 0)
@@ -1274,7 +1274,7 @@ HRESULT VirtualCamDeviceStream::StopAt( const REFERENCE_TIME *ptStop, BOOL bSend
     else
     {
         m_rtStopAt = -1;
-        m_bShouldFlush = false;
+        m_bShouldFlush = FALSE;
         m_dwStopCookie = 0;
     }
     

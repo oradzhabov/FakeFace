@@ -10,7 +10,7 @@ During processing of frames it uses dlib or parts of OpenFace to putting any hum
 
 # Minimum Requirements
 
-* Windows OS
+* Windows OS (x86 & x64)
 * Microsoft Visual Studio 2010
 
 
@@ -26,6 +26,7 @@ During processing of frames it uses dlib or parts of OpenFace to putting any hum
 * github: https://github.com/davisking/dlib
 * notes:
     1. dlib should not be just compiled but installed. Hence in my case, when I point dlib to install in local folder, I have next path for cmake entry __dlib_DIR__ D:/DLIB/dlib-18.18/build/msvc2010.x32/install/lib/cmake/dlib
+    2. I've used dlib 18.18
 
 ## boost
 * web: http://www.boost.org/
@@ -59,7 +60,8 @@ Use only release target
 # Using Cases
 
 ## GraphStudio
-* For testing purposes I use __Graphstudio__ (http://blog.monogram.sk/janos/tools/monogram-graphstudio/)
+* For testing purposes I use __Graphstudio__ (http://blog.monogram.sk/janos/2009/06/14/monogram-graphstudio-0320/)
+* Notice that if you build FakeFace for x64 platform, use __GraphStudio64__ instead of __GraphStudio__
 * Install and run it. Open project "./data/MONOGRAM GraphStudio/FakeFace Virtual Cam.grf"
 * This project connect virtual camera (registered before) and renderer
 * Start the graph
@@ -70,7 +72,8 @@ Use only release target
 * After several seconds, your face on the GraphStudio renderer will changed to that which imaged on the new file
 
 ## Skype
-* If you wish to use FakeFace with skype, you need to register virtual camera when Skype is turned off. Remember that virtual camera should be registered when no one application use your real camera device
+* Make sure that the destination platform of the installed version of Skype corresponds to the build destination platform of FakeFace
+* If you wish to use FakeFace with Skype, you need to register virtual camera when Skype is turned off. Remember that virtual camera should be registered when no one application use your real camera device
 * After virtual camera has been registered, VirtualCamManager has been started and Skype has been stared pick Skype menu: Tools >> Options >> Video settings
 * Your default camera will not be available
 * On the panel "Video settings" select webcam: "FakeFace Virtual Cam"
