@@ -35,6 +35,7 @@
 	IHeadEstimator	*	g_estimator = NULL;
     HANDLE              g_estimatorThread = 0;
     bool                g_isFirstEstimatorFrame;
+    HANDLE              g_estInputFrameReadyEvent;
     CRITICAL_SECTION    g_crit_input;
     CRITICAL_SECTION    g_crit_estimator; // work with estimator should be wrapped by this crit section
     CRITICAL_SECTION    g_crit_output;
@@ -50,6 +51,16 @@
         EnterCriticalSection(&g_crit_input);
             cv::Mat  cvFrameFlipped(480, 640, CV_8UC3, pData);
             cv::flip(cvFrameFlipped, g_estInputFrame, 0); // flip requires different holders
+
+            // To start processing, first set should set event to signal state
+            static bool a = false;
+            if (a == false)
+            {
+                if (! SetEvent(g_estInputFrameReadyEvent) ) 
+                    printf("SetEvent failed (%d)\n", GetLastError());
+            }
+            a = true;
+            
         LeaveCriticalSection(&g_crit_input);
     }
     BYTE *  getFromEstimator(void)
@@ -63,6 +74,9 @@
             {
                 std::swap (g_estOutputFrame.data, g_estOutputFrameBackbuffer.data);
                 g_IsEstOutputFrameHasBeenUpdated = false;
+
+                if (! SetEvent(g_estInputFrameReadyEvent) ) 
+                    printf("SetEvent failed (%d)\n", GetLastError());
             }
             result = g_estOutputFrameBackbuffer.data;
         LeaveCriticalSection(&g_crit_output);
@@ -82,7 +96,17 @@
 
         while (g_isEstimatorThreadShouldBeClose == false)
         {
-            // todo: actually here would be better to use thread-waiting-functions, instead of speed-up-loop
+            // Optimal strategy: continue processing right after previous result has been provided to consumer.
+            // To do it, event set to signal only from \getFromEstimator() and estimator have preared new results.
+            // Tests demonstrates that such strategy have 2x free CPU than we set signal's state in \putToEstimator().
+            DWORD dwWaitResult = WaitForSingleObject(   g_estInputFrameReadyEvent,  // event handle
+                                                        INFINITE);                  // indefinite wait
+            if (dwWaitResult == WAIT_OBJECT_0) // signal
+            {
+                // Set to nonsignaled. Next loop will lock thread till new source will be prepared
+                if (! ResetEvent(g_estInputFrameReadyEvent) )
+                    printf("SetEvent failed (%d)\n", GetLastError());
+            }
 
             EnterCriticalSection(&g_crit_input);
                 estInputFrame = g_estInputFrame.clone();
@@ -195,6 +219,14 @@
                         g_IsEstOutputFrameHasBeenUpdated = true;
                     LeaveCriticalSection(&g_crit_output);
                 }
+            }
+            else
+            {
+                // To prevent infinite waiting of signaled event, we should solve it
+                EnterCriticalSection(&g_crit_output);
+                    if (! SetEvent(g_estInputFrameReadyEvent) ) 
+                        printf("SetEvent failed (%d)\n", GetLastError());
+                LeaveCriticalSection(&g_crit_output);
             }
 
             // un-wrap part of code where estimator should be in stabilized state by their crit-section
@@ -355,6 +387,15 @@ HRESULT CaptureVideo()
 
     // Crit sections should be initialized before using \InitEstimator()
     InitEstimator(new OFEstimator(), "lomachenko.jpg");
+    /*
+        Create a manual-reset event object. The estInputFrame preparation thread sets this
+        object to the signaled state when it finishes preparation
+    */
+    g_estInputFrameReadyEvent = CreateEvent(NULL,               // default security attributes
+                                            TRUE,               // manual-reset event
+                                            FALSE,              // initial state is nonsignaled
+                                            TEXT("EstInputFrameReadyEvent")  // object name
+                                            );
     /*
         A thread created by _beginthread() will close the handle to the thread when the thread exits, while the handle returned 
         by _beginthreadex() will have to be explicitly closed by calling CloseHandle(), which is a similar to the detached thread 
@@ -1175,6 +1216,9 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
     g_isEstimatorThreadShouldBeClose = true;
+    if (! SetEvent(g_estInputFrameReadyEvent) )  // Set g_estInputFrameReadyEvent to signaled
+        printf("SetEvent failed (%d)\n", GetLastError());
+    CloseHandle(g_estInputFrameReadyEvent);
     CloseHandle(g_estimatorThread);
     CloseHandle(&g_crit_input);
     CloseHandle(&g_crit_estimator);

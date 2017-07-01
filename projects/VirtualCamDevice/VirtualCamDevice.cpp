@@ -1003,7 +1003,7 @@ HRESULT VirtualCamDeviceStream::OnThreadCreate()
 //////////////////////////////////////////////////////////////////////////
 //  IAMStreamConfig
 //////////////////////////////////////////////////////////////////////////
-// ros: actually this methid greatly differs to analogue solution here and should be checked
+// ros: actually this method greatly differs to analogue solution here and should be checked
 // https://www.codeproject.com/Articles/437617/DirectShow-Virtual-Video-Capture-Source-Filter-in
 #ifdef NATIVE_CODE
 HRESULT STDMETHODCALLTYPE VirtualCamDeviceStream::SetFormat(AM_MEDIA_TYPE *pmt)
