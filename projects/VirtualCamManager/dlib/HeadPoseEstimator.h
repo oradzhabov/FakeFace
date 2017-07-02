@@ -100,45 +100,7 @@ private:
     */
     cv::Point2f coordsOf(size_t face_idx, FACIAL_FEATURE feature) const;
 
-    /** Returns true if the lines intersect (and set r to the intersection
-     *  coordinates), false otherwise.
-     */
-    bool intersection(cv::Point2f o1, cv::Point2f p1,
-                      cv::Point2f o2, cv::Point2f p2,
-                      cv::Point2f &r,
-                      const float & eps = std::numeric_limits<float>::min()/*ros: was 1.e-8*/) const;
 
-    // Haar cascade frontal face detection routines
-    void setFaceCascade(const std::string cascadeFilePath);
-    void detectFaces(const cv::Mat &frame, const bool isFirstFrame);
-    void detectFaceAllSizes(const cv::Mat &frame);
-    void detectFaceAroundRoi(const cv::Mat &frame);
-    void detectFacesTemplateMatching(const cv::Mat &frame);
-    cv::Mat HeadPoseEstimator::getFaceTemplate(const cv::Mat &frame, cv::Rect face);
-    cv::Rect HeadPoseEstimator::doubleRectSize(const cv::Rect &inputRect, const cv::Rect &frameSize) const;
-    cv::Point HeadPoseEstimator::centerOfRect(const cv::Rect &rect) const;
-    static const double TICK_FREQUENCY;
-    bool isHaarLoaded;
-    double m_templateMatchingMaxDuration;
-    cv::CascadeClassifier* m_faceCascade;
-    cv::Mat m_matchingResult;
-    std::vector<cv::Rect> m_allFaces;
-    cv::Rect m_trackedFace;
-    cv::Rect m_faceRoi;
-    cv::Mat m_faceTemplate;
-    cv::Point m_facePosition;
-    int64 m_templateMatchingStartTime;
-    int64 m_templateMatchingCurrentTime;
-    int m_resizedWidth;
-    double m_scale;
-    bool m_foundFace;
-    bool m_templateMatchingRunning;
-    // >>>> Kalman Filter
-    cv::KalmanFilter * kf;
-    bool lastResult_kf;
-    double m_ticks_kf;
-    cv::Mat state;
-    cv::Mat meas;
     // >>>>
     // https://sourceforge.net/p/dclib/discussion/442518/thread/a21dd8fc/?limit=25#824e
     // http://dlib.net/video_tracking_ex.cpp.html

@@ -62,14 +62,14 @@ Use only release target
 ## GraphStudio
 * For testing purposes I use __Graphstudio__ (http://blog.monogram.sk/janos/2009/06/14/monogram-graphstudio-0320/)
 * Notice that if you build FakeFace for x64 platform, use __GraphStudio64__ instead of __GraphStudio__
-* Install and run it. Open project "./data/MONOGRAM GraphStudio/FakeFace Virtual Cam.grf"
+* Download and run it. Open project "./data/MONOGRAM GraphStudio/FakeFace Virtual Cam.grf"
 * This project connect virtual camera (registered before) and renderer
 * Start the graph
 * If you did not start VirtualCamManager, renderer will show noisy pixels
 * If VirtualCamManager has been started before, you will see your web-camera stream where your face will be switched to face of Vasyl Lomachenko - default fake face
-* Pick to caption panel of the __FakeFace Manager__ and press "S"-button on the keyboard
+* Pick to the __FakeFace Manager__ window and press "S"-button on the keyboard
 * OpenFile dialog will appear. Choose some file with human face photo
-* After several seconds, your face on the GraphStudio renderer will changed to that which imaged on the new file
+* After moment your face on the GraphStudio renderer will changed to that which imaged on the selected file
 
 ## Skype
 * Make sure that the destination platform of the installed version of Skype corresponds to the build destination platform of FakeFace

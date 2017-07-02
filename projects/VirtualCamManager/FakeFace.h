@@ -17,7 +17,7 @@ public:
 
     const int   Initialize(IHeadEstimator * estimator, const char * pFaceImageFile);
     const bool  IsInitialized() const;
-    const dlib::full_object_detection & GetLandmars() const;
+    const dlib::full_object_detection & GetLandmarks() const;
 //    const cv::Mat   GetImgOrig() const;
     const cv::Mat &  GetImg32f() const;
 };

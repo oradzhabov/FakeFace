@@ -51,16 +51,6 @@
         EnterCriticalSection(&g_crit_input);
             cv::Mat  cvFrameFlipped(480, 640, CV_8UC3, pData);
             cv::flip(cvFrameFlipped, g_estInputFrame, 0); // flip requires different holders
-
-            // To start processing, first set should set event to signal state
-            static bool a = false;
-            if (a == false)
-            {
-                if (! SetEvent(g_estInputFrameReadyEvent) ) 
-                    printf("SetEvent failed (%d)\n", GetLastError());
-            }
-            a = true;
-            
         LeaveCriticalSection(&g_crit_input);
     }
     BYTE *  getFromEstimator(void)
@@ -97,7 +87,7 @@
         while (g_isEstimatorThreadShouldBeClose == false)
         {
             // Optimal strategy: continue processing right after previous result has been provided to consumer.
-            // To do it, event set to signal only from \getFromEstimator() and estimator have preared new results.
+            // To do it, event set to signal state only from \getFromEstimator() and estimator have new results.
             // Tests demonstrates that such strategy have 2x free CPU than we set signal's state in \putToEstimator().
             DWORD dwWaitResult = WaitForSingleObject(   g_estInputFrameReadyEvent,  // event handle
                                                         INFINITE);                  // indefinite wait
@@ -141,7 +131,7 @@
                 //
                 if (estFaceMesh.empty() == false && g_fakeFace.IsInitialized())
                 {
-                    const dlib::full_object_detection & fakeShape = g_fakeFace.GetLandmars();
+                    const dlib::full_object_detection & fakeShape = g_fakeFace.GetLandmarks();
                     estInputFrame.convertTo(estInputFrame32f, CV_32FC3);
 
                     // fast way to clear image
@@ -222,7 +212,7 @@
             }
             else
             {
-                // To prevent infinite waiting of signaled event, we should solve it
+                // To prevent infinite waiting of signaled event, we should solve it here
                 EnterCriticalSection(&g_crit_output);
                     if (! SetEvent(g_estInputFrameReadyEvent) ) 
                         printf("SetEvent failed (%d)\n", GetLastError());
@@ -389,11 +379,12 @@ HRESULT CaptureVideo()
     InitEstimator(new OFEstimator(), "lomachenko.jpg");
     /*
         Create a manual-reset event object. The estInputFrame preparation thread sets this
-        object to the signaled state when it finishes preparation
+        object to the signaled state when it finishes preparation.
+        To start processing, first set should set event to signal state
     */
     g_estInputFrameReadyEvent = CreateEvent(NULL,               // default security attributes
                                             TRUE,               // manual-reset event
-                                            FALSE,              // initial state is nonsignaled
+                                            TRUE,              // initial state is nonsignaled(FALSE), signaled (TRUE)
                                             TEXT("EstInputFrameReadyEvent")  // object name
                                             );
     /*

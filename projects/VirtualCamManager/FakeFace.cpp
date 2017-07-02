@@ -23,7 +23,7 @@ CFakeFace::IsInitialized() const
 }
 
 const dlib::full_object_detection &
-CFakeFace::GetLandmars() const
+CFakeFace::GetLandmarks() const
 {
     return m_landmarkContainer;
 }
@@ -98,15 +98,15 @@ morphTriangle(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
     cv::Rect r2 = cv::boundingRect(t2);
     
     // Offset points by left top corner of the respective rectangles
-    std::vector<cv::Point2f> t1Rect, t2Rect, tRect;
-    std::vector<cv::Point> tRectInt;
+    std::vector<cv::Point2f> t1Rect(3), t2Rect(3), tRect(3);
+    std::vector<cv::Point> tRectInt(3);
     for(int i = 0; i < 3; i++)
     {
-        tRect.push_back( cv::Point2f( t[i].x - r.x, t[i].y - r.y) );
-        tRectInt.push_back( cv::Point(t[i].x - r.x, t[i].y - r.y) ); // for fillConvexPoly
+        tRect[i] = cv::Point2f( t[i].x - r.x, t[i].y - r.y);
+        tRectInt[i] = cv::Point(t[i].x - r.x, t[i].y - r.y); // for fillConvexPoly
         
-        t1Rect.push_back( cv::Point2f( t1[i].x - r1.x, t1[i].y - r1.y) );
-        t2Rect.push_back( cv::Point2f( t2[i].x - r2.x, t2[i].y - r2.y) );
+        t1Rect[i] = cv::Point2f( t1[i].x - r1.x, t1[i].y - r1.y);
+        t2Rect[i] = cv::Point2f( t2[i].x - r2.x, t2[i].y - r2.y);
     }
     
     // Get mask by filling triangle
