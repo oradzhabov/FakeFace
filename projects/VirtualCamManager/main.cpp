@@ -21,211 +21,13 @@
 // FaceTracker with wrappers
 // https://github.com/kylemcdonald/ofxFaceTracker
 
+#include "FaceSwitcher.h"
+#include "dlib/HeadPoseEstimator.h"
+#include "OpenFace/OFEstimator.h"
 //
 // Global data
 //
-#ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    #include <Windows.h>
-    #include <process.h>
-    #include "FakeFace.h"
-    #include "IHeadEstimator.h"
-    #include "dlib/HeadPoseEstimator.h"
-    #include "OpenFace/OFEstimator.h"
-
-	IHeadEstimator	*	g_estimator = NULL;
-    HANDLE              g_estimatorThread = 0;
-    bool                g_isFirstEstimatorFrame;
-    HANDLE              g_estInputFrameReadyEvent;
-    CRITICAL_SECTION    g_crit_input;
-    CRITICAL_SECTION    g_crit_estimator; // work with estimator should be wrapped by this crit section
-    CRITICAL_SECTION    g_crit_output;
-    bool                g_isEstimatorThreadShouldBeClose = false;
-    cv::Mat             g_estInputFrame(480, 640, CV_8UC3);
-    cv::Mat             g_estOutputFrame(480, 640, CV_8UC3);
-    cv::Mat             g_estOutputFrameBackbuffer(480, 640, CV_8UC3);
-    bool                g_IsEstOutputFrameHasBeenUpdated = false;
-    CFakeFace           g_fakeFace;
-    //
-    void    putToEstimator(BYTE * pData)
-    {
-        EnterCriticalSection(&g_crit_input);
-            cv::Mat  cvFrameFlipped(480, 640, CV_8UC3, pData);
-            cv::flip(cvFrameFlipped, g_estInputFrame, 0); // flip requires different holders
-        LeaveCriticalSection(&g_crit_input);
-    }
-    BYTE *  getFromEstimator(void)
-    {
-        BYTE *  result = NULL;
-        EnterCriticalSection(&g_crit_output);
-
-            // To avoid slow deep copy operation: g_estOutputFrameBackbuffer = g_estOutputFrame.clone()
-            // use backbuffer technique
-            if (g_IsEstOutputFrameHasBeenUpdated == true)
-            {
-                std::swap (g_estOutputFrame.data, g_estOutputFrameBackbuffer.data);
-                g_IsEstOutputFrameHasBeenUpdated = false;
-
-                if (! SetEvent(g_estInputFrameReadyEvent) ) 
-                    printf("SetEvent failed (%d)\n", GetLastError());
-            }
-            result = g_estOutputFrameBackbuffer.data;
-        LeaveCriticalSection(&g_crit_output);
-        return result;
-    }
-    unsigned  int __stdcall estimatorFunc(void*)
-    {
-        cv::Mat                                     estInputFrame(480, 640, CV_8UC3);
-        cv::Mat                                     estInputFrame32f(480, 640, CV_32FC3);
-        IHeadEstimator::TriMesh						estFaceMesh;
-        cv::Mat                                     imgMorph = cv::Mat::zeros(480, 640, CV_32FC3);
-        cv::Mat                                     imgMorph8uc3 = cv::Mat::zeros(480, 640, CV_8UC3);
-        cv::Mat                                     mask(480, 640, CV_8UC3);
-        //
-        
-        g_isFirstEstimatorFrame = true;
-
-        while (g_isEstimatorThreadShouldBeClose == false)
-        {
-            // Optimal strategy: continue processing right after previous result has been provided to consumer.
-            // To do it, event set to signal state only from \getFromEstimator() and estimator have new results.
-            // Tests demonstrates that such strategy have 2x free CPU than we set signal's state in \putToEstimator().
-            DWORD dwWaitResult = WaitForSingleObject(   g_estInputFrameReadyEvent,  // event handle
-                                                        INFINITE);                  // indefinite wait
-            if (dwWaitResult == WAIT_OBJECT_0) // signal
-            {
-                // Set to nonsignaled. Next loop will lock thread till new source will be prepared
-                if (! ResetEvent(g_estInputFrameReadyEvent) )
-                    printf("SetEvent failed (%d)\n", GetLastError());
-            }
-
-            EnterCriticalSection(&g_crit_input);
-                estInputFrame = g_estInputFrame.clone();
-                // todo: actually we could use follow line to avoid clone() but I'm not sure that .data will be good separated
-                // in different threads
-                // const cv::Mat   estInputFrame(480, 640, CV_8UC3, g_estInputFrame.data);
-            LeaveCriticalSection(&g_crit_input);
-
-            // wrap part of code where estimator should be in stabilized state by their crit-section
-            EnterCriticalSection(&g_crit_estimator);
-
-            if (g_isFirstEstimatorFrame == true)
-                g_estimator->GetTriangles(estFaceMesh);
-
-            g_estimator->update(estInputFrame, g_isFirstEstimatorFrame);
-
-            g_isFirstEstimatorFrame = false;
-
-
-            // calc poses, not just obtaining results
-            // todo: Actually, for obtaing shapes it does not necessary and may take additional time for processing
-            //std::vector<head_pose> poses = g_estimator->poses();
-
-            // Do not update result if we have no success
-            //if (poses.empty() == false)
-            if (g_estimator->getShapesNb() == 1)
-            {
-                const dlib::full_object_detection & estShape = g_estimator->getShape(0);
-
-                //
-                // If we have mesh and fake face
-                //
-                if (estFaceMesh.empty() == false && g_fakeFace.IsInitialized())
-                {
-                    const dlib::full_object_detection & fakeShape = g_fakeFace.GetLandmarks();
-                    estInputFrame.convertTo(estInputFrame32f, CV_32FC3);
-
-                    // fast way to clear image
-                    // http://answers.opencv.org/question/88254/most-efficient-way-to-clear-an-image-with-c-interface/
-                    imgMorph = cv::Mat::zeros( imgMorph.size(), imgMorph.type() );
-//imgMorph = estInputFrame32f; // todo: actually heere should be clone()
-
-                    const size_t                numTris = estFaceMesh.size();
-                    std::vector<cv::Point2f>    t1(3);
-                    std::vector<cv::Point2f>    t2(3);
-                    std::vector<cv::Point2f>    t2_all;
-                    for (size_t ti = 0; ti < numTris; ++ti)
-                    {
-                        const IHeadEstimator::sTriangle & tri = estFaceMesh[ti];
-
-                        t1[0] = toCv(fakeShape.part(tri.vInd[0]));
-                        t1[1] = toCv(fakeShape.part(tri.vInd[1]));
-                        t1[2] = toCv(fakeShape.part(tri.vInd[2]));
-
-                        t2[0] = toCv(estShape.part(tri.vInd[0]));
-                        t2[1] = toCv(estShape.part(tri.vInd[1]));
-                        t2[2] = toCv(estShape.part(tri.vInd[2]));
-    
-                        /*
-                            at least some info from original will make result natural in lighting sense
-                            0:fakeFace, 1:original
-                            BUT: Poisson blending will could make more natural result later.
-                        */
-                        const double morphFactor = 0.0;
-
-                        morphTriangle ( g_fakeFace.GetImg32f(),
-                                        estInputFrame32f,
-                                        imgMorph,
-                                        t1, t2, t2,
-                                        morphFactor);
-
-                        // store it for future using
-                        t2_all.insert (t2_all.end(), t2.begin(), t2.end());
-                    }
-
-                    mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
-
-                    cv::Mat temp8uc3;
-                    imgMorph.convertTo(temp8uc3, CV_8UC3);
-				    cv::Rect    estMeshRect = cv::boundingRect(t2_all);
-                    cv::threshold(temp8uc3, mask, 1, 255, cv::THRESH_BINARY);
-
-                    // Fast implementation of Poisson blend (not OpenCV's) negotiate to use lazy data preparation.
-                    // So it is not necessary to set \isLazyDataPrepared true because it does not effect to speed performance
-                    //
-				    // cv::Point   center = (estMeshRect.tl() + estMeshRect.br()) / 2;
-                    // cv::seamlessClone(temp, estInputFrame, mask, center, imgMorph8uc3, cv::NORMAL_CLONE);
-                    //
-                    PoissonBlend(estInputFrame, temp8uc3, mask, imgMorph8uc3, estMeshRect);
-
-                    //mask.convertTo (imgMorph8uc3, CV_8UC3);
-                    //imgMorph.convertTo (imgMorph8uc3, CV_8UC3);
-                    //
-                    // Set to true for slow OpenCV's version of Poisson Blending.
-                    //
-                    // isLazyDataPrepared      = true;
-
-                    EnterCriticalSection(&g_crit_output);
-                        cv::flip(imgMorph8uc3, g_estOutputFrame, 0); // flip requires different holders
-                        g_IsEstOutputFrameHasBeenUpdated = true;
-                    LeaveCriticalSection(&g_crit_output);
-                    
-                }
-                else // If we have not mesh OR fake face
-                {
-                    g_estimator->calc_pose(0); // to draw lines
-
-                    EnterCriticalSection(&g_crit_output);
-                        cv::flip(g_estimator->_debug, g_estOutputFrame, 0); // flip requires different holders
-                        g_IsEstOutputFrameHasBeenUpdated = true;
-                    LeaveCriticalSection(&g_crit_output);
-                }
-            }
-            else
-            {
-                // To prevent infinite waiting of signaled event, we should solve it here
-                EnterCriticalSection(&g_crit_output);
-                    if (! SetEvent(g_estInputFrameReadyEvent) ) 
-                        printf("SetEvent failed (%d)\n", GetLastError());
-                LeaveCriticalSection(&g_crit_output);
-            }
-
-            // un-wrap part of code where estimator should be in stabilized state by their crit-section
-            LeaveCriticalSection(&g_crit_estimator);
-        }
-
-        return 0;
-    }
-#endif // HEAD_POSE_ESTIMATOR_DEBUG
+CFaceSwitcher * g_faceSwitcher = NULL;
 
 HWND ghApp=0;
 #ifdef REGISTER_FILTERGRAPH
@@ -245,7 +47,7 @@ std::vector<std::wstring> device_names;
 
 class CFakeCallback : public ISampleGrabberCB 
 {
-	ULONG	m_ref;
+    ULONG	m_ref;
 public:
     //some variables and stuff... 
     STDMETHODIMP_(ULONG) AddRef()  { return m_ref++; }
@@ -263,68 +65,68 @@ public:
         return E_NOINTERFACE;
     }
 
-	STDMETHODIMP SampleCB( double SampleTime, IMediaSample * pms )
+    STDMETHODIMP SampleCB( double SampleTime, IMediaSample * pms )
     {
         const REFERENCE_TIME frame_timestamp = SampleTime >= 0 ? SampleTime * UNITS : 0;
 
-		BYTE *pData;
-		long lDataLen;
-		pms->GetPointer(&pData);
-		lDataLen = pms->GetSize();
-	
-		/*
-		for(int i = 0; i < lDataLen; ++i)
-			pData[i] = rand();
-		*/
-	/*
-		for(int i = 0; i < lDataLen - 3; i+=3)
-		{
-			pData[i] = 0; // B
-			pData[i+1] = 255; // G
-			pData[i+2] = 0; // R
-		}
-	*/
-		/*
-	HBITMAP hBmp = (HBITMAP) LoadImage( NULL, L"E:/Install/graphstudio/sample_3.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
-	HRESULT hr = g_pLiveSource->AddFrame(hBmp);
-	::DeleteObject(hBmp);
-		*/
-	    if (hMapFile != NULL)
-	    {
+        BYTE *pData;
+        long lDataLen;
+        pms->GetPointer(&pData);
+        lDataLen = pms->GetSize();
+    
+        /*
+        for(int i = 0; i < lDataLen; ++i)
+            pData[i] = rand();
+        */
+    /*
+        for(int i = 0; i < lDataLen - 3; i+=3)
+        {
+            pData[i] = 0; // B
+            pData[i+1] = 255; // G
+            pData[i+2] = 0; // R
+        }
+    */
+        /*
+    HBITMAP hBmp = (HBITMAP) LoadImage( NULL, L"E:/Install/graphstudio/sample_3.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
+    HRESULT hr = g_pLiveSource->AddFrame(hBmp);
+    ::DeleteObject(hBmp);
+        */
+        if (hMapFile != NULL)
+        {
             const int sizeOfLong = sizeof(long);
             const int sizeOfRefTime = sizeof(REFERENCE_TIME);
-		    unsigned char * pBuf = (unsigned char*) MapViewOfFile(hMapFile,   // handle to map object
-																    FILE_MAP_ALL_ACCESS, // read/write permission
-																    0,
-																    0,
-																    sizeOfLong + sizeOfRefTime + lDataLen);
+            unsigned char * pBuf = (unsigned char*) MapViewOfFile(hMapFile,   // handle to map object
+                                                                    FILE_MAP_ALL_ACCESS, // read/write permission
+                                                                    0,
+                                                                    0,
+                                                                    sizeOfLong + sizeOfRefTime + lDataLen);
 
-	       if (pBuf != NULL)
-	       {
-		       // CopyMemory((PVOID)pBuf, szMsg, (_tcslen(szMsg) * sizeof(TCHAR)));
-		       memcpy ((unsigned char*)pBuf, & lDataLen, sizeOfLong);
+           if (pBuf != NULL)
+           {
+               // CopyMemory((PVOID)pBuf, szMsg, (_tcslen(szMsg) * sizeof(TCHAR)));
+               memcpy ((unsigned char*)pBuf, & lDataLen, sizeOfLong);
 
                memcpy ((unsigned char*)pBuf + sizeOfLong, & frame_timestamp, sizeOfRefTime);
 
-		   
+           
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
                //
                // Async set/get
                //
-               putToEstimator (pData);
+               g_faceSwitcher->putToEstimator(pData);
 
-               pData = getFromEstimator();
+               pData = g_faceSwitcher->getFromEstimator();
 
                memcpy ((unsigned char*)pBuf + sizeOfLong + sizeOfRefTime, pData, lDataLen);
 #else
                memcpy ((unsigned char*)pBuf + sizeOfLong + sizeOfRefTime, pData, lDataLen);
 #endif
 
-		       UnmapViewOfFile(pBuf);
-	       }
-	    }
+               UnmapViewOfFile(pBuf);
+           }
+        }
 
-		return NOERROR;
+        return NOERROR;
     }
 
     STDMETHODIMP BufferCB( double SampleTime, BYTE * pBuffer, long BufferLen )
@@ -336,69 +138,10 @@ public:
 };
 CFakeCallback fakeGrabber;
 
-void
-InitEstimator(IHeadEstimator * newEstimator, const char * pFakeFaceFileName)
-{
-    // wrap part of code where estimator should be in stabilized state by their crit-section
-    EnterCriticalSection(&g_crit_estimator);
-
-    if (g_estimator != NULL)
-        delete g_estimator;
-    
-    g_estimator = newEstimator;
-
-    // Some about how to know the focal length
-    // http://photo.stackexchange.com/questions/61724/how-can-i-know-the-focal-length-and-sensor-size-of-my-webcam
-    // http://opencv-users.1802565.n2.nabble.com/How-t-o-measure-focal-length-in-logitech-webcam-td5316245.html
-	//
-    g_fakeFace.Initialize(g_estimator, pFakeFaceFileName);
-
-	// For example, say the webcam has a horizontal FOV of about 60 degrees and the image size is 640x480.
-	// Then the 4 parameters are:
-	// cx = 640/2 = 320
-	// cy = 480/2 = 240
-	// fx = fy = cx/tan(60/2 * pi / 180) = 554.26
-	g_estimator->Initialize(554.26f, 640/2, 480/2);
-    // Do not forget reinit main stream
-    g_isFirstEstimatorFrame = true;
-
-    // un-wrap part of code where estimator should be in stabilized state by their crit-section
-    LeaveCriticalSection(&g_crit_estimator);
-}
 
 HRESULT CaptureVideo()
 {
-#ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    //
-    InitializeCriticalSection(&g_crit_input);
-    InitializeCriticalSection(&g_crit_estimator);
-    InitializeCriticalSection(&g_crit_output);
-    g_isEstimatorThreadShouldBeClose = false;
-
-    // Crit sections should be initialized before using \InitEstimator()
-    InitEstimator(new OFEstimator(), "lomachenko.jpg");
-    /*
-        Create a manual-reset event object. The estInputFrame preparation thread sets this
-        object to the signaled state when it finishes preparation.
-        To start processing, first set should set event to signal state
-    */
-    g_estInputFrameReadyEvent = CreateEvent(NULL,               // default security attributes
-                                            TRUE,               // manual-reset event
-                                            TRUE,              // initial state is nonsignaled(FALSE), signaled (TRUE)
-                                            TEXT("EstInputFrameReadyEvent")  // object name
-                                            );
-    /*
-        A thread created by _beginthread() will close the handle to the thread when the thread exits, while the handle returned 
-        by _beginthreadex() will have to be explicitly closed by calling CloseHandle(), which is a similar to the detached thread 
-        in POSIX.
-
-        thread func created by _beginthreadex() returns an unsigned int and uses the __stdcall calling convention.
-
-        For more onfo see http://www.bogotobogo.com/cplusplus/multithreading_win32A.php
-    */
-    g_estimatorThread = (HANDLE)_beginthreadex(0, 0, &estimatorFunc, (void*)0, 0, 0);
-    WaitForSingleObject(estimatorFunc, INFINITE); // start thread
-#endif    
+    g_faceSwitcher = new CFaceSwitcher();
 
     HRESULT hr;
     IBaseFilter *pSrcFilter=NULL;
@@ -420,7 +163,7 @@ HRESULT CaptureVideo()
     }
 
 
-	hr = CreateVideoGraph(&pSrcFilter);
+    hr = CreateVideoGraph(&pSrcFilter);
     if (FAILED(hr))
     {
         // Don't display a message because CreateVideoGraph will handle it
@@ -429,28 +172,28 @@ HRESULT CaptureVideo()
 
     // Render the preview pin on the video capture filter
     // Use this instead of g_pGraph->RenderFile
-	/*
-		A pointer to a GUID that specifies one of the pin categories listed in Pin Property Set. 
-		To match any pin, regardless of category, set this parameter to NULL. Typical values include the following.
+    /*
+        A pointer to a GUID that specifies one of the pin categories listed in Pin Property Set. 
+        To match any pin, regardless of category, set this parameter to NULL. Typical values include the following.
 
         PIN_CATEGORY_CAPTURE
         PIN_CATEGORY_PREVIEW
         PIN_CATEGORY_CC
-	*/
+    */
 //	const GUID * pCategory = & PIN_CATEGORY_PREVIEW;
 //	const GUID * pCategory = & PIN_CATEGORY_CAPTURE;
 //	const GUID * pCategory = & PIN_CATEGORY_VIDEOPORT;
 //	const GUID * pCategory = & PIN_CATEGORY_CC;
 //	const GUID * pCategory = & PIN_CATEGORY_VBI;
 //  const GUID * pCategory = & PIN_CATEGORY_STILL;
-	const GUID * pCategory = NULL; // To match any pin, regardless of category, set this parameter to NULL
+    const GUID * pCategory = NULL; // To match any pin, regardless of category, set this parameter to NULL
 
-	IBaseFilter * renderer = NULL;
-	hr = CreateFilter(L"Null Renderer", & renderer, CLSID_LegacyAmFilterCategory);
-	hr = g_pGraph->AddFilter(renderer, L"renderer");
+    IBaseFilter * renderer = NULL;
+    hr = CreateFilter(L"Null Renderer", & renderer, CLSID_LegacyAmFilterCategory);
+    hr = g_pGraph->AddFilter(renderer, L"renderer");
 
 //    hr = g_pCapture->RenderStream (&PIN_CATEGORY_PREVIEW, &MEDIATYPE_Video, // ros:
-	hr = g_pCapture->RenderStream (pCategory, &MEDIATYPE_Video,
+    hr = g_pCapture->RenderStream (pCategory, &MEDIATYPE_Video,
                                    pSrcFilter, NULL, renderer);
     if (FAILED(hr))
     {
@@ -505,116 +248,116 @@ HRESULT CaptureVideo()
 // https://www.codeproject.com/Articles/158053/DirectShow-Filters-Development-Part-Live-Source
 HRESULT CreateVideoGraph(IBaseFilter ** ppLastFilterinGraph)
 {
-	HRESULT hr = E_FAIL;
-	IBaseFilter * ppSourceFilter = NULL;
+    HRESULT hr = E_FAIL;
+    IBaseFilter * ppSourceFilter = NULL;
 //	if (!FAILED(CreateFilter(L"PushSource Desktop Filter", & ppSourceFilter, CLSID_LegacyAmFilterCategory)))
-	if (!FAILED(FindCaptureDevice(&ppSourceFilter, 0, device_names)))
-	{
-		if (!FAILED(g_pGraph->AddFilter(ppSourceFilter, L"source")))
-		{
+    if (!FAILED(FindCaptureDevice(&ppSourceFilter, 0, device_names)))
+    {
+        if (!FAILED(g_pGraph->AddFilter(ppSourceFilter, L"source")))
+        {
 //*ppLastFilterinGraph = ppSourceFilter;
 //return S_OK;
 
-			// use AVI decompressor filter if source is camera
-			IBaseFilter * aviDecompressor = NULL;
-			if (!FAILED(CreateFilter(L"AVI Decompressor", & aviDecompressor, CLSID_LegacyAmFilterCategory)))
-			{
-				if (!FAILED(g_pGraph->AddFilter(aviDecompressor, L"AVI Decompressor")))
-				{
-					IPin *pOut = NULL;
-					// Find an output pin on the upstream filter.
-					if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
-					{
-						if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
-							pOut,            // Output pin on the upstream filter.
-							aviDecompressor)))    // Downstream filter.
-						{
-							// let source filter will be avi decompressor
-							SAFE_RELEASE(ppSourceFilter);
-							ppSourceFilter = aviDecompressor;
+            // use AVI decompressor filter if source is camera
+            IBaseFilter * aviDecompressor = NULL;
+            if (!FAILED(CreateFilter(L"AVI Decompressor", & aviDecompressor, CLSID_LegacyAmFilterCategory)))
+            {
+                if (!FAILED(g_pGraph->AddFilter(aviDecompressor, L"AVI Decompressor")))
+                {
+                    IPin *pOut = NULL;
+                    // Find an output pin on the upstream filter.
+                    if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
+                    {
+                        if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
+                            pOut,            // Output pin on the upstream filter.
+                            aviDecompressor)))    // Downstream filter.
+                        {
+                            // let source filter will be avi decompressor
+                            SAFE_RELEASE(ppSourceFilter);
+                            ppSourceFilter = aviDecompressor;
 //							ppSourceFilter->AddRef();
-						}
-					}
-					SAFE_RELEASE(pOut);
-				}
-			}
+                        }
+                    }
+                    SAFE_RELEASE(pOut);
+                }
+            }
 
-			// use ARGB32->RGB24 by tranform filter
-			IBaseFilter * tranformFilter = NULL;
-			if (!FAILED(CreateFilter(L"Image Effects (EZRGB24)", & tranformFilter, CLSID_LegacyAmFilterCategory)))
-			{
-				if (!FAILED(g_pGraph->AddFilter(tranformFilter, L"Image Effects")))
-				{
-					IPin *pOut = NULL;
-					// Find an output pin on the upstream filter.
-					if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
-					{
-						if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
-							pOut,            // Output pin on the upstream filter.
-							tranformFilter)))    // Downstream filter.
-						{
-							// let source filter will be avi decompressor
-							SAFE_RELEASE(ppSourceFilter);
-							ppSourceFilter = tranformFilter;
+            // use ARGB32->RGB24 by tranform filter
+            IBaseFilter * tranformFilter = NULL;
+            if (!FAILED(CreateFilter(L"Image Effects (EZRGB24)", & tranformFilter, CLSID_LegacyAmFilterCategory)))
+            {
+                if (!FAILED(g_pGraph->AddFilter(tranformFilter, L"Image Effects")))
+                {
+                    IPin *pOut = NULL;
+                    // Find an output pin on the upstream filter.
+                    if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
+                    {
+                        if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
+                            pOut,            // Output pin on the upstream filter.
+                            tranformFilter)))    // Downstream filter.
+                        {
+                            // let source filter will be avi decompressor
+                            SAFE_RELEASE(ppSourceFilter);
+                            ppSourceFilter = tranformFilter;
 //							ppSourceFilter->AddRef();
-						}
-					}
-					SAFE_RELEASE(pOut);
-				}
-			}
-			
+                        }
+                    }
+                    SAFE_RELEASE(pOut);
+                }
+            }
+            
 
-			IBaseFilter * SampleGrabFilter = NULL;
+            IBaseFilter * SampleGrabFilter = NULL;
 //			if (!FAILED(CreateFilter(L"SampleGrabberFilter", & SampleGrabFilter, CLSID_LegacyAmFilterCategory)))
             if (!FAILED(CreateFilter(L"SampleGrabber", & SampleGrabFilter, CLSID_LegacyAmFilterCategory)))
-			{
-				if (!FAILED(g_pGraph->AddFilter(SampleGrabFilter, L"SampleGrabberFilter")))
-				{
-					IPin *pOut = NULL;
-					if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
-					{
-						if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
-							pOut,            // Output pin on the upstream filter.
-							SampleGrabFilter)))    // Downstream filter.
-						{
-							ISampleGrabber * m_pISampleGrabber = NULL;
-							if (!FAILED(SampleGrabFilter->QueryInterface( IID_ISampleGrabber, (void**)&m_pISampleGrabber )))
-							{
-								m_pISampleGrabber->SetCallback(&fakeGrabber, 0);
-								//
-								DWORD HIGH_BUF_SIZE = 0;
-								DWORD LOW_BUF_SIZE = 0x00ffffff;
-								hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,    // use paging file
-																NULL,                    // default security
-																PAGE_READWRITE,          // read/write access
-																HIGH_BUF_SIZE,			// maximum object size (high-order DWORD)
-																LOW_BUF_SIZE,            // maximum object size (low-order DWORD)
-																TEXT("Local\\VirtualCamDeviceStream"));                 // name of mapping object
+            {
+                if (!FAILED(g_pGraph->AddFilter(SampleGrabFilter, L"SampleGrabberFilter")))
+                {
+                    IPin *pOut = NULL;
+                    if (!FAILED(FindUnconnectedPin(ppSourceFilter, PINDIR_OUTPUT, &pOut)))
+                    {
+                        if (!FAILED(ConnectFilters(g_pGraph, // Filter Graph Manager.
+                            pOut,            // Output pin on the upstream filter.
+                            SampleGrabFilter)))    // Downstream filter.
+                        {
+                            ISampleGrabber * m_pISampleGrabber = NULL;
+                            if (!FAILED(SampleGrabFilter->QueryInterface( IID_ISampleGrabber, (void**)&m_pISampleGrabber )))
+                            {
+                                m_pISampleGrabber->SetCallback(&fakeGrabber, 0);
+                                //
+                                DWORD HIGH_BUF_SIZE = 0;
+                                DWORD LOW_BUF_SIZE = 0x00ffffff;
+                                hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE,    // use paging file
+                                                                NULL,                    // default security
+                                                                PAGE_READWRITE,          // read/write access
+                                                                HIGH_BUF_SIZE,			// maximum object size (high-order DWORD)
+                                                                LOW_BUF_SIZE,            // maximum object size (low-order DWORD)
+                                                                TEXT("Local\\VirtualCamDeviceStream"));                 // name of mapping object
                                 DWORD lastError = GetLastError();
                                 if (hMapFile == NULL)
                                 {
                                     Msg(TEXT("Could not create file mapping object (%d).\n"),
                                         GetLastError());
                                 }
-								hr = S_OK;
-							}
-							SAFE_RELEASE(m_pISampleGrabber);
+                                hr = S_OK;
+                            }
+                            SAFE_RELEASE(m_pISampleGrabber);
 
 
-							*ppLastFilterinGraph = SampleGrabFilter;
+                            *ppLastFilterinGraph = SampleGrabFilter;
 //							(*ppLastFilterinGraph)->AddRef();
 
 //							SAFE_RELEASE(ppSourceFilter);
 //							ppSourceFilter = SampleGrabFilter;
-						}
-					}
-					SAFE_RELEASE(pOut);
-				}
-			}
-		}
-	}
-	SAFE_RELEASE(ppSourceFilter);
-	return hr;
+                        }
+                    }
+                    SAFE_RELEASE(pOut);
+                }
+            }
+        }
+    }
+    SAFE_RELEASE(ppSourceFilter);
+    return hr;
 }
 
 
@@ -628,9 +371,9 @@ HRESULT FindCaptureDevice(IBaseFilter ** ppSrcFilter, const int selectIndex, std
     IEnumMoniker *pClassEnum = NULL;
 
     if (!ppSrcFilter)
-	{
+    {
         return E_POINTER;
-	}
+    }
    
     // Create the system device enumerator
     hr = CoCreateInstance (CLSID_SystemDeviceEnum, NULL, CLSCTX_INPROC,
@@ -642,77 +385,77 @@ HRESULT FindCaptureDevice(IBaseFilter ** ppSrcFilter, const int selectIndex, std
 
     // Create an enumerator for the video capture devices
 
-	if (SUCCEEDED(hr))
-	{
-	    hr = pDevEnum->CreateClassEnumerator (CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
-		if (FAILED(hr))
-		{
-			Msg(TEXT("Couldn't create class enumerator!  hr=0x%x"), hr);
-	    }
-	}
+    if (SUCCEEDED(hr))
+    {
+        hr = pDevEnum->CreateClassEnumerator (CLSID_VideoInputDeviceCategory, &pClassEnum, 0);
+        if (FAILED(hr))
+        {
+            Msg(TEXT("Couldn't create class enumerator!  hr=0x%x"), hr);
+        }
+    }
 
-	if (SUCCEEDED(hr))
-	{
-		// If there are no enumerators for the requested type, then 
-		// CreateClassEnumerator will succeed, but pClassEnum will be NULL.
-		if (pClassEnum == NULL)
-		{
-			MessageBox(ghApp,TEXT("No video capture device was detected.\r\n\r\n")
-				TEXT("This sample requires a video capture device, such as a USB WebCam,\r\n")
-				TEXT("to be installed and working properly.  The sample will now close."),
-				TEXT("No Video Capture Hardware"), MB_OK | MB_ICONINFORMATION);
-			hr = E_FAIL;
-		}
-	}
+    if (SUCCEEDED(hr))
+    {
+        // If there are no enumerators for the requested type, then 
+        // CreateClassEnumerator will succeed, but pClassEnum will be NULL.
+        if (pClassEnum == NULL)
+        {
+            MessageBox(ghApp,TEXT("No video capture device was detected.\r\n\r\n")
+                TEXT("This sample requires a video capture device, such as a USB WebCam,\r\n")
+                TEXT("to be installed and working properly.  The sample will now close."),
+                TEXT("No Video Capture Hardware"), MB_OK | MB_ICONINFORMATION);
+            hr = E_FAIL;
+        }
+    }
 
     // Use the first video capture device on the device list.
     // Note that if the Next() call succeeds but there are no monikers,
     // it will return S_FALSE (which is not a failure).  Therefore, we
     // check that the return code is S_OK instead of using SUCCEEDED() macro.
 
-	if (SUCCEEDED(hr))
-	{
-		HRESULT lastHR = S_FALSE;
-		IMoniker * lastMoniker = NULL;
+    if (SUCCEEDED(hr))
+    {
+        HRESULT lastHR = S_FALSE;
+        IMoniker * lastMoniker = NULL;
 
         /*
-		if (true)
-		{
-			hr = pClassEnum->Next (1, &pMoniker, NULL);
-			if (hr == S_FALSE)
-			{
-				Msg(TEXT("Unable to access video capture device!"));   
-				hr = E_FAIL;
-			}
-		}
-		else
-		{
-			while (hr == S_OK)
-			{
-				hr = pClassEnum->Next (1, &pMoniker, NULL);
-		
-				if (hr == S_FALSE && lastHR == S_OK)
-				{
-				}
-				else
-				{
-					lastHR = hr;
-					lastMoniker = pMoniker;
-					if (hr == S_FALSE)
-					{
-						Msg(TEXT("Unable to access video capture device!"));   
-						hr = E_FAIL;
-					}
-				}
-			}
-			pMoniker = lastMoniker;
-			hr = lastHR;
-		}
+        if (true)
+        {
+            hr = pClassEnum->Next (1, &pMoniker, NULL);
+            if (hr == S_FALSE)
+            {
+                Msg(TEXT("Unable to access video capture device!"));   
+                hr = E_FAIL;
+            }
+        }
+        else
+        {
+            while (hr == S_OK)
+            {
+                hr = pClassEnum->Next (1, &pMoniker, NULL);
+        
+                if (hr == S_FALSE && lastHR == S_OK)
+                {
+                }
+                else
+                {
+                    lastHR = hr;
+                    lastMoniker = pMoniker;
+                    if (hr == S_FALSE)
+                    {
+                        Msg(TEXT("Unable to access video capture device!"));   
+                        hr = E_FAIL;
+                    }
+                }
+            }
+            pMoniker = lastMoniker;
+            hr = lastHR;
+        }
         */
         int counter = 0;
-		while (hr == S_OK)
-		{
-			hr = pClassEnum->Next (1, &pMoniker, NULL);
+        while (hr == S_OK)
+        {
+            hr = pClassEnum->Next (1, &pMoniker, NULL);
 
             if (hr == S_OK)
             {
@@ -747,9 +490,9 @@ HRESULT FindCaptureDevice(IBaseFilter ** ppSrcFilter, const int selectIndex, std
             pMoniker = lastMoniker;
             hr = S_OK;
         }
-	}
+    }
 
-	if (SUCCEEDED(hr))
+    if (SUCCEEDED(hr))
     {
         // Bind Moniker to a filter object
         hr = pMoniker->BindToObject(0,0,IID_IBaseFilter, (void**)&pSrc);
@@ -760,13 +503,13 @@ HRESULT FindCaptureDevice(IBaseFilter ** ppSrcFilter, const int selectIndex, std
     }
 
     // Copy the found filter pointer to the output parameter.
-	if (SUCCEEDED(hr))
-	{
-	    *ppSrcFilter = pSrc;
-		(*ppSrcFilter)->AddRef();
-	}
+    if (SUCCEEDED(hr))
+    {
+        *ppSrcFilter = pSrc;
+        (*ppSrcFilter)->AddRef();
+    }
 
-	SAFE_RELEASE(pSrc);
+    SAFE_RELEASE(pSrc);
     SAFE_RELEASE(pMoniker);
     SAFE_RELEASE(pDevEnum);
     SAFE_RELEASE(pClassEnum);
@@ -999,7 +742,7 @@ void Msg(TCHAR *szFormat, ...)
 HRESULT HandleGraphEvent(void)
 {
     LONG evCode;
-	LONG_PTR evParam1, evParam2;
+    LONG_PTR evParam1, evParam2;
     HRESULT hr=S_OK;
 
     if (!g_pME)
@@ -1058,14 +801,14 @@ LRESULT CALLBACK WndMainProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
                     {
                         // todo: actually each estimator could be cashed and do not reinstanced each time.
                         // as was noticed in tests, the main time for this operation takes by constructor of estimator
-                        InitEstimator(new HeadPoseEstimator(), NULL);
+                        g_faceSwitcher->InitEstimator(new HeadPoseEstimator(), NULL);
                     }
                     break;
                 case '2':
                     {
                         // todo: actually each estimator could be cashed and do not reinstanced each time.
                         // as was noticed in tests, the main time for this operation takes by constructor of estimator
-                        InitEstimator(new OFEstimator(), NULL);
+                        g_faceSwitcher->InitEstimator(new OFEstimator(), NULL);
                     }
                     break;
                 case 's': // Switch face
@@ -1093,16 +836,7 @@ LRESULT CALLBACK WndMainProc (HWND hwnd, UINT message, WPARAM wParam, LPARAM lPa
                         {
                             SetCurrentDirectory(Buffer);
 
-                            // wrap part of code where estimator should be in stabilized state by their crit-section
-                            EnterCriticalSection(&g_crit_estimator);
-                            //
-                            g_fakeFace.Initialize(g_estimator, ws2s(szFileName).c_str() );
-                            // Do not forget reinit main stream
-                            g_estimator->Initialize(554.26f, 640/2, 480/2);
-                            g_isFirstEstimatorFrame = true;
-                            //
-                            // un-wrap part of code where estimator should be in stabilized state by their crit-section
-                            LeaveCriticalSection(&g_crit_estimator);
+                            g_faceSwitcher->SetNewFace(ws2s(szFileName).c_str());
                         }
                     }
                     break;  //or return 0; if you don't want to pass it further to def proc
@@ -1206,18 +940,9 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
     }
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    g_isEstimatorThreadShouldBeClose = true;
-    if (! SetEvent(g_estInputFrameReadyEvent) )  // Set g_estInputFrameReadyEvent to signaled
-        printf("SetEvent failed (%d)\n", GetLastError());
-    CloseHandle(g_estInputFrameReadyEvent);
-    CloseHandle(g_estimatorThread);
-    CloseHandle(&g_crit_input);
-    CloseHandle(&g_crit_estimator);
-    CloseHandle(&g_crit_output);
-	if (g_estimator)
-		delete g_estimator;
+    delete g_faceSwitcher;
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
-	CloseHandle(hMapFile);
+    CloseHandle(hMapFile);
 
     // Release COM
     CoUninitialize();

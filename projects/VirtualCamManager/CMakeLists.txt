@@ -12,6 +12,7 @@ SET(SOURCE
 	dlib/EstimatorSourceData.cpp
 	dlib/HeadPoseEstimator.cpp
 	OpenFace/OFEstimator.cpp
+	FaceSwitcher.cpp
 )
 
 SET(HEADERS
@@ -22,6 +23,7 @@ SET(HEADERS
 	dlib/EstimatorSourceData.h
 	dlib/HeadPoseEstimator.h
 	OpenFace/OFEstimator.h
+	FaceSwitcher.h
 )
 
 # include_directories(./include)
