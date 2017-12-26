@@ -111,11 +111,11 @@ public:
            
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
                //
-               // Async set/get
+               // Async push/pull
                //
-               g_faceSwitcher->putToEstimator(pData);
+               g_faceSwitcher->push(pData);
 
-               pData = g_faceSwitcher->getFromEstimator();
+               pData = g_faceSwitcher->pull();
 
                memcpy ((unsigned char*)pBuf + sizeOfLong + sizeOfRefTime, pData, lDataLen);
 #else

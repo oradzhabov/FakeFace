@@ -252,181 +252,11 @@ head_pose HeadPoseEstimator::calc_pose(const EstimatorSourceData & srcData) cons
     return pose;
 }
 
-head_pose HeadPoseEstimator::calc_pose(size_t face_idx) const
+void HeadPoseEstimator::drawMesh(size_t face_idx) const
 {
-    cv::Mat         projectionMat       = cv::Mat::zeros(3,3,CV_32F);
-    cv::Matx33f     projection          = projectionMat;
-
-    projection(0,0) = focalLength;
-    projection(1,1) = focalLength;
-    projection(0,2) = opticalCenterX;
-    projection(1,2) = opticalCenterY;
-    projection(2,2) = 1;
-
-    std::vector<cv::Point3f> head_points3df;
-
-    head_points3df.push_back(P3D_SELLION);
-    head_points3df.push_back(P3D_RIGHT_EYE);
-    head_points3df.push_back(P3D_LEFT_EYE);
-    head_points3df.push_back(P3D_RIGHT_EAR);
-    head_points3df.push_back(P3D_LEFT_EAR);
-    head_points3df.push_back(P3D_MENTON);
-    head_points3df.push_back(P3D_NOSE);
-    head_points3df.push_back(P3D_STOMMION);
-
-    std::vector<cv::Point2f> detected_points2df;
-
-    detected_points2df.push_back(coordsOf(face_idx, SELLION));
-    detected_points2df.push_back(coordsOf(face_idx, RIGHT_EYE));
-    detected_points2df.push_back(coordsOf(face_idx, LEFT_EYE));
-    detected_points2df.push_back(coordsOf(face_idx, RIGHT_SIDE));
-    detected_points2df.push_back(coordsOf(face_idx, LEFT_SIDE));
-    detected_points2df.push_back(coordsOf(face_idx, MENTON));
-    detected_points2df.push_back(coordsOf(face_idx, NOSE));
-
-    auto stomion = (coordsOf(face_idx, MOUTH_CENTER_TOP) + coordsOf(face_idx, MOUTH_CENTER_BOTTOM)) * 0.5;
-    detected_points2df.push_back(stomion);
-
-    cv::Mat rvec, tvec;
-    cv::Matx33d rotation;
-
-
-    // Find the 3D pose of our head
-#if 1 // This case does not control the quality, but fast and averagly not a bad result
-    cv::solvePnP(head_points3df, detected_points2df,
-                projection, cv::noArray(),
-                rvec, tvec, false,
-#if CV_VERSION_MAJOR >= 3
-            cv::SOLVEPNP_ITERATIVE);
-#else
-            cv::ITERATIVE);
-#endif
-#else // Here quality could be controlled, but parameters(and their values) should be researched
-    int iterationsCount = 1000;
-    float reprojectionError = 20;//8.0
-    int minInliersCount = 1000;
-    // Find the 3D pose of our head
-    cv::solvePnPRansac(head_points3df, detected_points2df,
-            projection, cv::noArray(),
-            rvec, tvec, false,
-
-            iterationsCount,
-            reprojectionError,
-            minInliersCount,
-            cv::noArray(),
-#if CV_VERSION_MAJOR >= 3
-            cv::SOLVEPNP_ITERATIVE);
-#else
-            cv::ITERATIVE);
-#endif
-#endif // 1
-/*
-    {
-//        tvec.create(3, 1, CV_64F);
-
-        size_t  i,j;
-        std::vector<CvPoint3D32f> modelPoints;
-        std::vector<CvPoint2D32f> srcImagePoints;
-
-        for (i = 0; i < head_points3df.size(); ++i)
-            modelPoints.push_back(cvPoint3D32f(head_points3df[i].x, head_points3df[i].y, head_points3df[i].z));
-
-        for (i = 0; i < detected_points2df.size(); ++i)
-            srcImagePoints.push_back( cvPoint2D32f( detected_points2df[i].x, detected_points2df[i].y ) );
-
-        CvPOSITObject *positObject = cvCreatePOSITObject( &modelPoints[0], static_cast<int>(modelPoints.size()) );
-
-        //Estimate the pose
-        float * rotation_matrix = new float[9];
-        float * translation_vector = new float[3];
-
-        CvTermCriteria criteria = cvTermCriteria(CV_TERMCRIT_EPS | CV_TERMCRIT_ITER, 100, 1.0e-4f);
-
-        cvPOSIT( positObject, &srcImagePoints[0], focalLength, criteria, rotation_matrix, translation_vector );
-
-        for (i = 0; i < 3; ++i)
-        {
-            for (j = 0; j < 3; ++j)
-            {
-                rotation(i,j) = rotation_matrix[i*3 + j];
-            }
-            tvec.at<double>(i) = translation_vector[i];
-        }
-
-        cvReleasePOSITObject(&positObject);
-        delete rotation_matrix;
-        delete translation_vector;
-    }
-    */
-
-    Rodrigues(rvec, rotation);
-
-    head_pose pose = head_pose(
-        rotation(0,0),    rotation(0,1),    rotation(0,2),    tvec.at<double>(0)/1000,
-        rotation(1,0),    rotation(1,1),    rotation(1,2),    tvec.at<double>(1)/1000,
-        rotation(2,0),    rotation(2,1),    rotation(2,2),    tvec.at<double>(2)/1000,
-                    0,                0,                0,                     1);
-
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    /*
-    {
-        std::vector<cv::Point3f> axes;
-        axes.push_back(cv::Point3f(0,0,0));
-        axes.push_back(cv::Point3f(50,0,0));
-        axes.push_back(cv::Point3f(0,50,0));
-        axes.push_back(cv::Point3f(0,0,50));
-        std::vector<cv::Point2f> projected_axes;
-
-        for (size_t i = 0; i < axes.size(); ++i)
-        {
-            cv::Matx41d vec(axes[i].x, axes[i].y, axes[i].z, 1.0);
-            cv::Matx41d vec_in_cam_cs = pose * vec;
-            cv::Matx31f vec_in_cam_cs_f(vec_in_cam_cs(0), vec_in_cam_cs(1), vec_in_cam_cs(2));
-            cv::Matx31f proj = projection * vec_in_cam_cs_f;
-            //
-            projected_axes.push_back(cv::Point2f(proj(0), proj(1)));
-        }
-        line(_debug, projected_axes[0], projected_axes[3], cv::Scalar(255,0,0),2,CV_AA);
-        line(_debug, projected_axes[0], projected_axes[2], cv::Scalar(0,255,0),2,CV_AA);
-        line(_debug, projected_axes[0], projected_axes[1], cv::Scalar(0,0,255),2,CV_AA);
-    }
-    */
-    
     if (m_FaceMesh.empty())
     {
-        std::vector<cv::Point2f> reprojected_points;
-
-        // projects points from the model coordinate space to the image coordinates.
-        // Also computes derivatives of the image coordinates w.r.t the intrinsic and extrinsic camera parameters
-        cv::projectPoints(head_points3df, rvec, tvec, projection, cv::noArray(), reprojected_points);
-
-    
-        std::vector<cv::Point2f>::iterator it = reprojected_points.begin();
-        std::vector<cv::Point2f>::iterator ite = reprojected_points.end();
-        for (; it != ite; ++it) {
-            cv::Point2f & point = *it;
-            circle(_debug, point,2, cv::Scalar(0,255,255),2);
-        }
-    
-
-        std::vector<cv::Point3f> axes;
-        axes.push_back(cv::Point3f(0,0,0));
-        axes.push_back(cv::Point3f(50,0,0));
-        axes.push_back(cv::Point3f(0,50,0));
-        axes.push_back(cv::Point3f(0,0,50));
-        std::vector<cv::Point2f> projected_axes;
-
-        // projects points from the model coordinate space to the image coordinates.
-        // Also computes derivatives of the image coordinates w.r.t the intrinsic and extrinsic camera parameters
-        cv::projectPoints(axes, rvec, tvec, projection, cv::noArray(), projected_axes);
-
-        line(_debug, projected_axes[0], projected_axes[3], cv::Scalar(255,0,0),2,CV_AA);
-        line(_debug, projected_axes[0], projected_axes[2], cv::Scalar(0,255,0),2,CV_AA);
-        line(_debug, projected_axes[0], projected_axes[1], cv::Scalar(0,0,255),2,CV_AA);
-
-        // Sellion position
-        putText(_debug, "(" + std::to_string(_Longlong(pose(0,3) * 100)) + "cm, " + std::to_string(_Longlong(pose(1,3) * 100)) + "cm, " + std::to_string(_Longlong(pose(2,3) * 100)) + "cm)", coordsOf(face_idx, SELLION), cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0,0,255),2);
-
         for (int i = 0; i < faces.size(); ++i)
         {
             const dlib::rectangle & r = faces[i];
@@ -439,8 +269,6 @@ head_pose HeadPoseEstimator::calc_pose(size_t face_idx) const
     }
 
 #endif
-
-    return pose;
 }
 
 const size_t
@@ -455,17 +283,6 @@ HeadPoseEstimator::getShape(const size_t & index) const
     return shapes[index];
 }
 
-std::vector<head_pose> HeadPoseEstimator::poses() const {
-    
-    std::vector<head_pose> res;
-
-    for (auto i = 0; i < faces.size(); i++){
-        res.push_back(calc_pose(i));
-    }
-
-    return res;
-
-}
 
 cv::Point2f HeadPoseEstimator::coordsOf(size_t face_idx, FACIAL_FEATURE feature) const
 {

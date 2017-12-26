@@ -23,7 +23,7 @@ public:
 
 	virtual void update(const cv::InputArray image, const bool isFirstFrame);
 
-	virtual head_pose calc_pose(size_t face_idx) const;
+	virtual void drawMesh(size_t face_idx) const;
 
 	virtual const size_t    getShapesNb() const;
 

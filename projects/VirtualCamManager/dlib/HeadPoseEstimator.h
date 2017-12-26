@@ -68,13 +68,11 @@ public:
     virtual ~HeadPoseEstimator();
     virtual void update(const cv::InputArray image, const bool isFirstFrame);
 
-    virtual head_pose calc_pose(size_t face_idx) const;
+    virtual void drawMesh(size_t face_idx) const;
     head_pose calc_pose(const EstimatorSourceData & ) const;
 
 	virtual const size_t    getShapesNb() const;
     virtual const dlib::full_object_detection & getShape(const size_t & index) const;
-
-    std::vector<head_pose> poses() const;
 
     float focalLength;
     float opticalCenterX;

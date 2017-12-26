@@ -13,8 +13,8 @@ public:
 
     void				InitEstimator(IHeadEstimator * newEstimator, const char * pFakeFaceFileName);
     void				SetNewFace(const char * pFakeFaceFileName);
-    void				putToEstimator(BYTE * pData);
-    BYTE *				getFromEstimator(void);
+    void				push(BYTE * pData);
+    BYTE *				pull(void);
 
 protected:
 

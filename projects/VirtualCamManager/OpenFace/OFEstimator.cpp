@@ -267,8 +267,8 @@ OFEstimator::update(const cv::InputArray image, const bool isFirstFrame)
 	}
 }
 
-head_pose
-OFEstimator::calc_pose(size_t face_idx) const
+void
+OFEstimator::drawMesh(size_t face_idx) const
 {
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
 	if (m_landmarks.empty() == false)
@@ -290,7 +290,6 @@ OFEstimator::calc_pose(size_t face_idx) const
 		}
 	}
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
-	return head_pose();
 }
 
 const size_t

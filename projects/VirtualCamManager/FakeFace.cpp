@@ -54,9 +54,6 @@ CFakeFace::Initialize(IHeadEstimator * estimator, const char * pFaceImageFile)
     estimator->Initialize(fx,cx,cy);
     estimator->update(m_imgOrig, true);
 
-    // calc poses, not just obtaining results
-    // todo: Actually, for ontaing shapes it does not necessary and may take additional time for processing
-    //std::vector<head_pose> poses = estimator->poses();
 
     // if any result has been obtained
     if (estimator->getShapesNb() > 0)

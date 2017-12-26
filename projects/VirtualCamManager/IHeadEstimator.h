@@ -12,10 +12,7 @@ class IHeadEstimator
 {
 public:
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
-    struct sTriangle
-    {
-        size_t  vInd[3];
-    };
+    struct sTriangle { size_t  vInd[3]; };
 	typedef std::vector<IHeadEstimator::sTriangle>	TriMesh;
 
     mutable cv::Mat _debug;
@@ -32,7 +29,7 @@ public:
 
 	virtual void update(const cv::InputArray image, const bool isFirstFrame) = 0;
 
-	virtual head_pose calc_pose(size_t face_idx) const = 0;
+	virtual void drawMesh(size_t face_idx) const = 0;
 
 	virtual const size_t    getShapesNb() const = 0;
 

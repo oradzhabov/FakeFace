@@ -18,8 +18,8 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
     while (m_isEstimatorThreadShouldBeClose == false)
     {
         // Optimal strategy: continue processing right after previous result has been provided to consumer.
-        // To do it, event set to signal state only from \getFromEstimator() and estimator have new results.
-        // Tests demonstrates that such strategy have 2x free CPU than we set signal's state in \putToEstimator().
+        // To do it, event set to signal state only from \pull() and estimator have new results.
+        // Tests demonstrates that such strategy have 2x free CPU than we set signal's state in \push().
         DWORD dwWaitResult = WaitForSingleObject(m_estInputFrameReadyEvent,  // event handle
                                                 INFINITE);                  // indefinite wait
         if (dwWaitResult == WAIT_OBJECT_0) // signal
@@ -47,12 +47,7 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
         m_isFirstEstimatorFrame = false;
 
 
-        // calc poses, not just obtaining results
-        // todo: Actually, for obtaing shapes it does not necessary and may take additional time for processing
-        //std::vector<head_pose> poses = m_pEstimator->poses();
-
         // Do not update result if we have no success
-        //if (poses.empty() == false)
         if (m_pEstimator->getShapesNb() == 1)
         {
             const dlib::full_object_detection & estShape = m_pEstimator->getShape(0);
@@ -133,7 +128,7 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
             }
             else // If we have not mesh OR fake face
             {
-                m_pEstimator->calc_pose(0); // to draw lines
+                m_pEstimator->drawMesh(0); // to draw lines
 
                 EnterCriticalSection(&m_crit_output);
                 cv::flip(m_pEstimator->_debug, m_estOutputFrame, 0); // flip requires different holders
@@ -246,14 +241,14 @@ void CFaceSwitcher::InitEstimator(IHeadEstimator * newEstimator, const char * pF
     SetNewFace(pFakeFaceFileName);
 }
 
-void CFaceSwitcher::putToEstimator(BYTE * pData) {
+void CFaceSwitcher::push(BYTE * pData) {
     EnterCriticalSection(&m_crit_input);
     cv::Mat  cvFrameFlipped(480, 640, CV_8UC3, pData);
     cv::flip(cvFrameFlipped, m_estInputFrame, 0); // flip requires different holders
     LeaveCriticalSection(&m_crit_input);
 }
 
-BYTE * CFaceSwitcher::getFromEstimator(void) {
+BYTE * CFaceSwitcher::pull(void) {
     BYTE *  result = NULL;
     EnterCriticalSection(&m_crit_output);
 
