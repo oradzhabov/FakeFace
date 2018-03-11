@@ -29,6 +29,29 @@
 //
 CFaceSwitcher * g_faceSwitcher = NULL;
 
+void Msg(TCHAR *szFormat, ...)
+{
+    TCHAR szBuffer[1024];  // Large buffer for long filenames or URLs
+    const size_t NUMCHARS = sizeof(szBuffer) / sizeof(szBuffer[0]);
+    const int LASTCHAR = NUMCHARS - 1;
+
+    // Format the input string
+    va_list pArgs;
+    va_start(pArgs, szFormat);
+
+    // Use a bounded buffer size to prevent buffer overruns.  Limit count to
+    // character size minus one to allow for a NULL terminating character.
+    (void)StringCchVPrintf(szBuffer, NUMCHARS - 1, szFormat, pArgs);
+    va_end(pArgs);
+
+    // Ensure that the formatted string is NULL-terminated
+    szBuffer[LASTCHAR] = TEXT('\0');
+
+    MessageBox(NULL, szBuffer, TEXT("Application Message"), MB_OK | MB_ICONERROR);
+}
+
+
+#if !defined(TEST_CONSOLE)
 HWND ghApp=0;
 #ifdef REGISTER_FILTERGRAPH
     DWORD g_dwGraphRegister=0;
@@ -717,28 +740,6 @@ void RemoveGraphFromRot(DWORD pdwRegister)
 #endif
 
 
-void Msg(TCHAR *szFormat, ...)
-{
-    TCHAR szBuffer[1024];  // Large buffer for long filenames or URLs
-    const size_t NUMCHARS = sizeof(szBuffer) / sizeof(szBuffer[0]);
-    const int LASTCHAR = NUMCHARS - 1;
-
-    // Format the input string
-    va_list pArgs;
-    va_start(pArgs, szFormat);
-
-    // Use a bounded buffer size to prevent buffer overruns.  Limit count to
-    // character size minus one to allow for a NULL terminating character.
-    (void)StringCchVPrintf(szBuffer, NUMCHARS - 1, szFormat, pArgs);
-    va_end(pArgs);
-
-    // Ensure that the formatted string is NULL-terminated
-    szBuffer[LASTCHAR] = TEXT('\0');
-
-    MessageBox(NULL, szBuffer, TEXT("Application Message"), MB_OK | MB_ICONERROR);
-}
-
-
 HRESULT HandleGraphEvent(void)
 {
     LONG evCode;
@@ -949,6 +950,49 @@ int PASCAL WinMain(HINSTANCE hInstance, HINSTANCE hInstP, LPSTR lpCmdLine, int n
 
     return (int) msg.wParam;
 }
+#else // TEST_CONSOLE
+
+#include "opencv2/opencv.hpp"
+
+void main() {
+    cv::Mat frame8uc3r640x480flipped;
+    cv::namedWindow("Output", 1);
+    cv::namedWindow("Original", 1);
+    g_faceSwitcher = new CFaceSwitcher();
+
+    cv::VideoCapture camGrabber(0);
+    while (true) {
+        cv::Mat frameFliped,frame;
+
+        camGrabber >> frame;
+
+        // Prepare image CS
+        cv::flip(frame, frameFliped, 0);
+
+        // Prepare image format
+        frameFliped.convertTo(frameFliped, CV_8UC3);
+        cv::resize(frameFliped, frame8uc3r640x480flipped, cv::Size(640, 480));
+
+        // Push prepared image to face switcher
+        g_faceSwitcher->push(frame8uc3r640x480flipped.data);
+
+        int key = cv::waitKey(5);
+        if (key == 27)
+            break;
+
+        cv::Mat Result, Original;
+        cv::Mat ResultFlipped(480, 640, CV_8UC3, g_faceSwitcher->pull());
+        cv::Mat OriginalFlipped(480, 640, CV_8UC3, frame8uc3r640x480flipped.data);
+        cv::flip(ResultFlipped, Result, -1);
+        cv::flip(OriginalFlipped, Original, -1);
+
+        cv::imshow("Output", Result);
+        cv::imshow("Original", Original);
+    };
+
+    delete g_faceSwitcher;
+}
+#endif // TEST_CONSOLE
 
 
 

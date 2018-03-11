@@ -69,6 +69,38 @@ IHeadEstimator::getTriangles(const int shapeIndex, cv::Rect & estMeshRect) const
     return result;
 }
 
+std::vector<std::vector<cv::Point2f>>
+IHeadEstimator::getTriangles(const cv::Mat container) const
+{
+    std::vector<std::vector<cv::Point2f>>   result;
+    const size_t                            numTris = m_FaceMesh.size();
+    const int                               srcWidth = container.cols;
+    const int                               srcHeight = container.rows;
+    const int                               horizPartsNb = (numTris - numTris % 2) / 2 + numTris % 2;
+    const int                               partWidth = (srcWidth - srcWidth % horizPartsNb) / horizPartsNb;
+
+    result.resize(numTris, std::vector<cv::Point2f>(3));
+
+    int ti = 0;
+    for (size_t partInd = 0; partInd < horizPartsNb; partInd++)
+    {
+        result[ti][0] = cv::Point2f(partInd * partWidth, 0);
+        result[ti][1] = cv::Point2f(partInd * partWidth + partWidth - 1, 0);
+        result[ti][2] = cv::Point2f(partInd * partWidth, srcHeight - 1);
+        ti++;
+
+        if (ti < numTris)
+        {
+            result[ti][0] = cv::Point2f(partInd * partWidth + partWidth - 1, 0);
+            result[ti][1] = cv::Point2f(partInd * partWidth + partWidth - 1, srcHeight - 1);
+            result[ti][2] = cv::Point2f(partInd * partWidth, srcHeight - 1);
+            ti++;
+        }
+    }
+
+    return result;
+}
+
 const int
 IHeadEstimator::readFaceMesh(const char * pFileName)
 {

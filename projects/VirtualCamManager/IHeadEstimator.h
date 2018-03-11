@@ -43,6 +43,7 @@ public:
     * @detail If mesh had not been loaded before or estimator had not recognize requsted shape, returns empty array
     */
     std::vector<std::vector<cv::Point2f>> getTriangles(const int shapeIndex, cv::Rect & estMeshRect) const;
+    std::vector<std::vector<cv::Point2f>> getTriangles(const cv::Mat container) const;
 protected:
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
