@@ -1,4 +1,6 @@
 #include "IHeadEstimator.h"
+#include "FakeFace.h"
+#include <opencv2/imgproc.hpp>
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
 
@@ -15,6 +17,56 @@ IHeadEstimator::IHeadEstimator()
     else
         std::cout << "File conn.txt with face-mesh has been read successfully" << std::endl;
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
+}
+
+std::vector<std::vector<cv::Point2f>>
+IHeadEstimator::getTriangles(CFakeFace * pFakeFace) const
+{
+    std::vector<std::vector<cv::Point2f>>   result;
+    const dlib::full_object_detection       & fakeShape = pFakeFace->GetLandmarks();
+    const size_t                            numTris = m_FaceMesh.size();
+
+    if (fakeShape.num_parts() > 0) {
+        result.resize(numTris, std::vector<cv::Point2f>(3));
+
+        for (size_t ti = 0; ti < numTris; ++ti)
+        {
+            const IHeadEstimator::sTriangle & tri = m_FaceMesh[ti];
+
+            result[ti][0] = toCv(fakeShape.part(tri.vInd[0]));
+            result[ti][1] = toCv(fakeShape.part(tri.vInd[1]));
+            result[ti][2] = toCv(fakeShape.part(tri.vInd[2]));
+        }
+    }
+    return result;
+}
+
+std::vector<std::vector<cv::Point2f>>
+IHeadEstimator::getTriangles(const int shapeIndex, cv::Rect & estMeshRect) const
+{
+    std::vector<std::vector<cv::Point2f>>   result;
+    const size_t                            numTris = m_FaceMesh.size();
+    const dlib::full_object_detection       & estShape = getShape(shapeIndex);
+    std::vector<cv::Point2f>                tri_all;
+
+    if (estShape.num_parts() > 0) {
+        result.resize(numTris, std::vector<cv::Point2f>(3));
+        for (size_t ti = 0; ti < numTris; ++ti)
+        {
+            const IHeadEstimator::sTriangle & tri = m_FaceMesh[ti];
+
+            result[ti][0] = toCv(estShape.part(tri.vInd[0]));
+            result[ti][1] = toCv(estShape.part(tri.vInd[1]));
+            result[ti][2] = toCv(estShape.part(tri.vInd[2]));
+
+            // store it for future using
+            tri_all.insert(tri_all.end(), result[ti].begin(), result[ti].end());
+        }
+    }
+
+    estMeshRect = cv::boundingRect(tri_all);
+
+    return result;
 }
 
 const int
@@ -51,12 +103,6 @@ IHeadEstimator::readFaceMesh(const char * pFileName)
         m_FaceMesh.clear();
 
     return result;
-}
-
-void
-IHeadEstimator::GetTriangles(IHeadEstimator::TriMesh & result) const
-{
-    result = m_FaceMesh;
 }
 
 #endif // HEAD_POSE_ESTIMATOR_DEBUG

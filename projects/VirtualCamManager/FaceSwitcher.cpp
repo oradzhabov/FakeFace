@@ -7,10 +7,10 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
 {
     cv::Mat                                     estInputFrame(480, 640, CV_8UC3);
     cv::Mat                                     estInputFrame32f(480, 640, CV_32FC3);
-    IHeadEstimator::TriMesh						estFaceMesh;
-    cv::Mat                                     imgMorph = cv::Mat::zeros(480, 640, CV_32FC3);
+    cv::Mat                                     otherFace32fc3 = cv::Mat::zeros(480, 640, CV_32FC3);
     cv::Mat                                     imgMorph8uc3 = cv::Mat::zeros(480, 640, CV_8UC3);
     cv::Mat                                     mask(480, 640, CV_8UC3);
+    std::vector<std::vector<cv::Point2f>>       otherFaceTriangles;
     //
 
     m_isFirstEstimatorFrame = true;
@@ -40,7 +40,7 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
         EnterCriticalSection(&m_crit_estimator);
 
         if (m_isFirstEstimatorFrame == true)
-            m_pEstimator->GetTriangles(estFaceMesh);
+            otherFaceTriangles = m_pEstimator->getTriangles(&m_fakeFace);
 
         m_pEstimator->update(estInputFrame, m_isFirstEstimatorFrame);
 
@@ -50,60 +50,41 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
         // Do not update result if we have no success
         if (m_pEstimator->getShapesNb() == 1)
         {
-            const dlib::full_object_detection & estShape = m_pEstimator->getShape(0);
-
+            cv::Rect                                estMeshRect;
+            std::vector<std::vector<cv::Point2f>>   faceTriangles = m_pEstimator->getTriangles(0, estMeshRect);
             //
             // If we have mesh and fake face
             //
-            if (estFaceMesh.empty() == false && m_fakeFace.IsInitialized())
+            if (!otherFaceTriangles.empty() && m_fakeFace.IsInitialized() && faceTriangles.size() == otherFaceTriangles.size())
             {
-                const dlib::full_object_detection & fakeShape = m_fakeFace.GetLandmarks();
                 estInputFrame.convertTo(estInputFrame32f, CV_32FC3);
 
                 // fast way to clear image
                 // http://answers.opencv.org/question/88254/most-efficient-way-to-clear-an-image-with-c-interface/
-                imgMorph = cv::Mat::zeros(imgMorph.size(), imgMorph.type());
-                //imgMorph = estInputFrame32f; // todo: actually heere should be clone()
+                otherFace32fc3 = cv::Mat::zeros(otherFace32fc3.size(), otherFace32fc3.type());
+                //otherFace32fc3 = estInputFrame32f; // todo: actually here should be clone()
 
-                const size_t                numTris = estFaceMesh.size();
-                std::vector<cv::Point2f>    t1(3);
-                std::vector<cv::Point2f>    t2(3);
-                std::vector<cv::Point2f>    t2_all;
-                for (size_t ti = 0; ti < numTris; ++ti)
+                for (size_t ti = 0; ti < faceTriangles.size(); ++ti)
                 {
-                    const IHeadEstimator::sTriangle & tri = estFaceMesh[ti];
-
-                    t1[0] = toCv(fakeShape.part(tri.vInd[0]));
-                    t1[1] = toCv(fakeShape.part(tri.vInd[1]));
-                    t1[2] = toCv(fakeShape.part(tri.vInd[2]));
-
-                    t2[0] = toCv(estShape.part(tri.vInd[0]));
-                    t2[1] = toCv(estShape.part(tri.vInd[1]));
-                    t2[2] = toCv(estShape.part(tri.vInd[2]));
-
                     /*
                     at least some info from original will make result natural in lighting sense
                     0:fakeFace, 1:original
-                    BUT: Poisson blending will could make more natural result later.
+                    BUT: Poisson blending could make more natural result after.
                     */
                     const double morphFactor = 0.0;
 
                     morphTriangle(m_fakeFace.GetImg32f(),
-                        estInputFrame32f,
-                        imgMorph,
-                        t1, t2, t2,
-                        morphFactor);
-
-                    // store it for future using
-                    t2_all.insert(t2_all.end(), t2.begin(), t2.end());
+                                    estInputFrame32f,
+                                    otherFace32fc3,
+                                    otherFaceTriangles[ti], faceTriangles[ti], faceTriangles[ti],
+                                    morphFactor);
                 }
 
                 mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
 
-                cv::Mat temp8uc3;
-                imgMorph.convertTo(temp8uc3, CV_8UC3);
-                cv::Rect    estMeshRect = cv::boundingRect(t2_all);
-                cv::threshold(temp8uc3, mask, 1, 255, cv::THRESH_BINARY);
+                cv::Mat otherFace8uc3;
+                otherFace32fc3.convertTo(otherFace8uc3, CV_8UC3);
+                cv::threshold(otherFace8uc3, mask, 1, 255, cv::THRESH_BINARY);
 
                 // Fast implementation of Poisson blend (not OpenCV's) negotiate to use lazy data preparation.
                 // So it is not necessary to set \isLazyDataPrepared true because it does not effect to speed performance
@@ -111,10 +92,10 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
                 // cv::Point   center = (estMeshRect.tl() + estMeshRect.br()) / 2;
                 // cv::seamlessClone(temp, estInputFrame, mask, center, imgMorph8uc3, cv::NORMAL_CLONE);
                 //
-                PoissonBlend(estInputFrame, temp8uc3, mask, imgMorph8uc3, estMeshRect);
+                PoissonBlend(estInputFrame, otherFace8uc3, mask, imgMorph8uc3, estMeshRect);
 
                 //mask.convertTo (imgMorph8uc3, CV_8UC3);
-                //imgMorph.convertTo (imgMorph8uc3, CV_8UC3);
+                //otherFace32fc3.convertTo (imgMorph8uc3, CV_8UC3);
                 //
                 // Set to true for slow OpenCV's version of Poisson Blending.
                 //

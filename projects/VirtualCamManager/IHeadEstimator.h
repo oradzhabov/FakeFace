@@ -7,7 +7,7 @@
 
 typedef cv::Matx44d head_pose;
 
-
+class CFakeFace;
 class IHeadEstimator
 {
 public:
@@ -17,8 +17,6 @@ public:
 
     mutable cv::Mat _debug;
 
-	void GetTriangles(IHeadEstimator::TriMesh & result) const;
-   
 #endif // HEAD_POSE_ESTIMATOR_DEBUG
 
     IHeadEstimator();
@@ -35,7 +33,16 @@ public:
 
 	virtual const dlib::full_object_detection & getShape(const size_t & index) const = 0;
 
-	
+    /**
+    * @brief Return triangles from fake face image
+    * @detail If mesh had not been loaded before or CFakeFace object had not recognize face, returns empty array
+    */
+    std::vector<std::vector<cv::Point2f>> getTriangles(CFakeFace * pFakeFace) const;
+    /**
+    * @brief Return triangles from current found face image
+    * @detail If mesh had not been loaded before or estimator had not recognize requsted shape, returns empty array
+    */
+    std::vector<std::vector<cv::Point2f>> getTriangles(const int shapeIndex, cv::Rect & estMeshRect) const;
 protected:
 
 #ifdef HEAD_POSE_ESTIMATOR_DEBUG
