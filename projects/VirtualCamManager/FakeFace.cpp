@@ -90,9 +90,11 @@ morphTriangle(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
 {
     
     // Find bounding rectangle for each triangle
-    cv::Rect r = cv::boundingRect(t);
-    cv::Rect r1 = cv::boundingRect(t1);
-    cv::Rect r2 = cv::boundingRect(t2);
+    cv::Rect r = cv::boundingRect(t) & cv::Rect(0, 0, img.cols, img.rows);
+    cv::Rect r1 = cv::boundingRect(t1) & cv::Rect(0, 0, img1.cols, img1.rows);
+    cv::Rect r2 = cv::boundingRect(t2) & cv::Rect(0, 0, img2.cols, img2.rows);
+
+    if (r.area() == 0 || r1.area() == 0 || r2.area() == 0) return;
     
     // Offset points by left top corner of the respective rectangles
     std::vector<cv::Point2f> t1Rect(3), t2Rect(3), tRect(3);
@@ -130,6 +132,19 @@ morphTriangle(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
     img(r) = img(r) + imgRect;
 }
 
+void
+morphTriangles(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
+    std::vector<std::vector<cv::Point2f>> & t1,
+    std::vector<std::vector<cv::Point2f>> & t2,
+    std::vector<std::vector<cv::Point2f>> & t,
+    const double & morphFactor)
+{
+    if (t1.size() != t2.size() || t1.size() != t.size()) return;
+
+    for (size_t ti = 0; ti < t.size(); ++ti)
+        morphTriangle(img1, img2, img,  t1[ti], t2[ti], t[ti],  morphFactor);
+}
+
 // source:
 // https://www.shadertoy.com/view/4l3Xzl#
 //
@@ -146,7 +161,7 @@ void PoissonBlend(const cv::Mat & base, const cv::Mat & src, const cv::Mat & mas
         cv::Mat & res_prev = (iter % 2) == 0 ? res2 : res1;
         cv::Mat & res = (iter % 2) == 0 ? res1 : res2;
         
-#ifdef USE_PPL
+#ifdef USE_PPL1
         Concurrency::parallel_for ((int)(roi.y), (int)(roi.y + roi.height), [&](int i){
 #else
         for(int i = roi.y; i < roi.y + roi.height; ++i){
@@ -162,29 +177,36 @@ void PoissonBlend(const cv::Mat & base, const cv::Mat & src, const cv::Mat & mas
                     neighbours[2] = cv::Point(j,i-d);
                     neighbours[3] = cv::Point(j,i+d);
 
-                    cv::Vec3f col = res_prev.at<cv::Vec3b>(p);
-                    //cv::Vec3f col (0,0,0);
-                    for (int n = 0; n < 4; ++n)
+                    if (p.inside(cv::Rect(0, 0, res_prev.cols, res_prev.rows)))
                     {
-                        const cv::Point & q = neighbours[n];
+                        cv::Vec3f col = res_prev.at<cv::Vec3b>(p);
+                        //cv::Vec3f col (0,0,0);
+                        for (int n = 0; n < 4; ++n)
+                        {
+                            const cv::Point & q = neighbours[n];
 
-                        if (mask.at<cv::Vec3b>(q)[0] == 255)
-                        {
-                            col += res_prev.at<cv::Vec3b>(q);
-                            //
-                            col += src.at<cv::Vec3b>(p);
-                            col -= src.at<cv::Vec3b>(q);
+                            if (mask.at<cv::Vec3b>(q)[0] == 255)
+                            {
+                                if (q.inside(cv::Rect(0, 0, res_prev.cols, res_prev.rows)))
+                                {
+                                    col += res_prev.at<cv::Vec3b>(q);
+                                    //
+                                    col += src.at<cv::Vec3b>(p);
+                                    col -= src.at<cv::Vec3b>(q);
+                                }
+                            }
+                            else
+                            {
+                                if (q.inside(cv::Rect(0, 0, base.cols, base.rows)))
+                                    col += base.at<cv::Vec3b>(q);
+                            }
                         }
-                        else
-                        {
-                            col += base.at<cv::Vec3b>(q);
-                        }
+                        col /= float(4 + 1); // 4 neighbours and 1 from res_prev
+                        res.at<cv::Vec3b>(p) = col;
                     }
-                    col /= float(4 + 1); // 4 neighbours and 1 from res_prev
-                    res.at<cv::Vec3b>(p) = col;
                 }
             }
-#ifdef USE_PPL
+#ifdef USE_PPL1
         });
 #else
         }

@@ -22,13 +22,14 @@ public:
     const cv::Mat &  GetImg32f() const;
 };
 
-// Warps and alpha blends triangular regions from img1 and img2 to img
+// Warps and morphFactor blends triangular regions from img1 and img2 to img
 void
-morphTriangle(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img,
-                std::vector<cv::Point2f> &t1,
-                std::vector<cv::Point2f> &t2,
-                std::vector<cv::Point2f> &t,
-                const double & alpha);
+morphTriangles(const cv::Mat & img1, const cv::Mat &img2, cv::Mat &img, 
+                std::vector<std::vector<cv::Point2f>> & t1,
+                std::vector<std::vector<cv::Point2f>> & t2,
+                std::vector<std::vector<cv::Point2f>> & t,
+                const double & morphFactor);
+
 void PoissonBlend(const cv::Mat & base, const cv::Mat & src, const cv::Mat & mask, cv::Mat & res1, const cv::Rect & roi);
 
 

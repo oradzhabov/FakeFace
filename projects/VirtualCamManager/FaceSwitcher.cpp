@@ -64,21 +64,15 @@ unsigned  int __stdcall CFaceSwitcher::estimatorFunc(void*)
                 otherFace32fc3 = cv::Mat::zeros(otherFace32fc3.size(), otherFace32fc3.type());
                 //otherFace32fc3 = estInputFrame32f; // todo: actually here should be clone()
 
-                for (size_t ti = 0; ti < faceTriangles.size(); ++ti)
-                {
-                    /*
-                    at least some info from original will make result natural in lighting sense
-                    0:fakeFace, 1:original
-                    BUT: Poisson blending could make more natural result after.
-                    */
-                    const double morphFactor = 0.0;
-
-                    morphTriangle(m_fakeFace.GetImg32f(),
-                                    estInputFrame32f,
-                                    otherFace32fc3,
-                                    otherFaceTriangles[ti], faceTriangles[ti], faceTriangles[ti],
-                                    morphFactor);
-                }
+                /*
+                at least some info from original will make result natural in lighting sense
+                0:fakeFace, 1:original
+                BUT: Poisson blending could make more natural result after.
+                */
+                const double morphFactor = 0.0;
+                morphTriangles( m_fakeFace.GetImg32f(), estInputFrame32f, otherFace32fc3,
+                                otherFaceTriangles, faceTriangles, faceTriangles,
+                                morphFactor);
 
                 mask = cv::Mat::zeros(estInputFrame.size(), estInputFrame.type());
 
